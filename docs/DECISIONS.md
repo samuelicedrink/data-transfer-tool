@@ -8,6 +8,22 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — Owner approved M6; current tool becomes v1, new design starts as v2
+
+- The owner asked to keep the current tool as **v1** and to start the new
+  Select-screen design (user picker, Modified / Size / Relevance columns) as
+  **v2**, with both exes available in the release folder.
+- M6 merged to `main` and tagged `m6`. The current code is released as
+  `v1.0.0` (tag `v1.0.0`, maintenance branch `v1`). This is earlier than the M6
+  proposal below: the manual tests have still not been run, so v1.0.0 carries
+  that warning in the README and change log until they pass. Fixes found by the
+  manual tests go to the `v1` branch as `v1.0.x`.
+- "Release folder" = `release\v1\` and `release\v2\` in the working copy, built
+  by `scripts\Build-Release.ps1` from a tag or branch. It is not committed
+  (binaries are never committed); the exes can also be attached to GitHub
+  Releases if the owner wants that.
+- v2 work follows the same milestone rules, on branches named `v2-m1-…`.
+
 ## 2026-11-15 — M6: what remains before release (for owner review)
 
 - The manual tests in `MANUAL_TESTS.md` have not been run. Until they pass, the
