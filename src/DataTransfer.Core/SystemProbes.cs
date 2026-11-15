@@ -133,14 +133,19 @@ namespace DataTransfer.Core
             // the client's own shutdown switch lets it finish cleanly
             foreach (var path in paths)
             {
-                try { using (var s = Process.Start(new ProcessStartInfo(path, "/shutdown") { UseShellExecute = false, CreateNoWindow = true })) s?.WaitForExit(10000); }
+                // through the shell: started with UseShellExecute=false this helper never exited (seen in M3 testing)
+                try { using (var s = Process.Start(new ProcessStartInfo(path, "/shutdown") { UseShellExecute = true })) s?.WaitForExit(10000); }
                 catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException) { notes?.Add("OneDrive /shutdown failed: " + ex.Message); }
             }
             var deadline = DateTime.UtcNow.AddSeconds(15);
             while (DateTime.UtcNow < deadline && running.Any(p => { try { return !p.HasExited; } catch { return false; } })) Thread.Sleep(250);
-            foreach (var p in running)
+            foreach (var p in running) p.Dispose();
+            // whatever is left in this session by now (a hung client or the shutdown helper itself) is ended
+            var settle = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < settle && IsRunning()) Thread.Sleep(250);
+            foreach (var p in Process.GetProcessesByName("OneDrive").Where(p => p.SessionId == session))
             {
-                try { if (!p.HasExited) { p.Kill(); notes?.Add("OneDrive did not shut down by itself and was ended."); } }
+                try { if (!p.HasExited) { p.Kill(); p.WaitForExit(5000); notes?.Add("OneDrive did not shut down by itself and was ended."); } }
                 catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException) { notes?.Add("Could not stop OneDrive: " + ex.Message); }
                 p.Dispose();
             }
@@ -169,7 +174,9 @@ namespace DataTransfer.Core
                     var psi = elevated
                         ? new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), "\"" + path + "\"")
                         : new ProcessStartInfo(path, "/background");
-                    psi.UseShellExecute = false;
+                    // started through the shell so the client does not inherit this process's handles
+                    // (an inherited console pipe kept a calling script waiting for as long as OneDrive ran)
+                    psi.UseShellExecute = true;
                     using (Process.Start(psi)) { }
                 }
                 catch (Exception ex) when (ex is Win32Exception || ex is InvalidOperationException) { notes?.Add("Could not restart OneDrive: " + ex.Message); }

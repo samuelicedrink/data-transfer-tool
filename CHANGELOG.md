@@ -21,6 +21,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - Unit and integration tests (`tests/DataTransfer.Core.Tests`, NUnit, test-only NuGet packages): parser tests on the captured M1 logs, command-builder tests, and engine tests that run the real Robocopy on generated trees (cancel and resume, locked-file retry, destination loss, progress).
 - Console driver `src/DttCli` (scan, run, resume, retry, show) for exercising the library without a UI.
 
+- M3 pre-flight engine in `src/DataTransfer.Core` with ten checks (administrator and backup privilege, log folder, destination incl. a path longer than 260 characters, power, open applications, other signed-in users, source scan, cloud-only files, EFS files, free space and FAT32), each pass/warn/fail with details, acknowledgement, and a fix where the tool can act (close applications, stop OneDrive, close other users' applications).
+- The tool's own read-only folder walk (`SourceWalker`): names unreadable folders, counts cloud-only and EFS files, follows the same exclusions as the Robocopy command.
+- Own network connection to a UNC destination with user name and password (password in memory only).
+- `DttCli preflight` console command; stand-in application `tests/DttDummyApp` so tests never close a real program.
+
 ### Changed
 
 - Flag set after M1 testing (approved by the owner 2026-11-14): add `/BYTES` (exact byte counts; default output prints rounded sizes such as `1.7 m`), add `/FP` (same file-line shape with and without `/MT`) and add `/XA:O` (excludes cloud-only OneDrive files, verified on Windows 11 build 26200). No spec flag removed.
@@ -42,3 +47,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 ### Fixed
 
 - Parser now reads negative Robocopy error codes and treats error 433 (device does not exist) as destination loss; both were found in the real volume-removal log.
+
+### Test findings (M3, 2026-11-14, not elevated)
+
+- The walk and Robocopy's scan agree file for file and byte for byte on generated trees (total and to-copy).
+- Cloud-only check verified on generated files in a real OneDrive folder: 3 cloud-only files found by the walk, Robocopy skipped the same 3, nothing was downloaded.
+- OneDrive's own `/shutdown` helper never exits when started without the shell; it is now started through the shell and any leftover OneDrive process is ended. Restarting OneDrive through the shell also stops it inheriting the tool's handles.
+- Closing applications verified with the stand-in app: one closed on request, one that refused was force-closed after the timeout.
+- Not testable here: UNC destination with real credentials, a second signed-in user, EFS files (Windows Home), battery power, FAT32 destination. These go to the M6 manual tests.

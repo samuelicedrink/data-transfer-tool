@@ -139,6 +139,9 @@ namespace DataTransfer.Core
                     Activity?.Invoke("Stopping OneDrive");
                     foreach (var p in OneDriveControl.Stop(notes))
                         if (!stoppedOneDrive.Contains(p, StringComparer.OrdinalIgnoreCase)) stoppedOneDrive.Add(p);
+                    // helper processes of the client take a moment to follow it down
+                    for (int i = 0; i < 40 && OneDriveControl.IsRunning() && !ct.IsCancellationRequested; i++) Thread.Sleep(250);
+                    notes.Add(OneDriveControl.IsRunning() ? "OneDrive is still running." : "OneDrive stopped; it will be started again after the job.");
                     apps = apps.Where(a => !a.Name.Equals("OneDrive", StringComparison.OrdinalIgnoreCase)).ToList();
                 }
                 Activity?.Invoke($"Asking {apps.Count} application process(es) to close (force-close after {timeout.TotalSeconds:0} s)");
