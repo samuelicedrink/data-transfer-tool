@@ -15,6 +15,10 @@ namespace DataTransferTool
         /// <summary>Destination password. Memory only.</summary>
         public string Password;
         public ProfileInfo Profiles = ProfileInfo.FromSystem();
+        /// <summary>"Save credentials for resume" ticked: DPAPI file written when the copy starts.</summary>
+        public bool SaveCredentials;
+        /// <summary>The failures CSV written after the last run, if there were failures.</summary>
+        public string FailuresCsv;
         public PreflightEngine Preflight;
         /// <summary>Every pre-flight engine of this session; any of them may have stopped OneDrive.</summary>
         public readonly System.Collections.Generic.List<PreflightEngine> AllPreflights = new System.Collections.Generic.List<PreflightEngine>();

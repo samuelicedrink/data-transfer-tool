@@ -2,7 +2,7 @@
 
 A portable data-export tool for Windows 10 and Windows 11: a single `.exe` (C# WinForms, .NET Framework 4.8) that IT staff run from a USB stick to copy a user's selected folders to a local, USB or network destination using Robocopy.
 
-> **Status:** M1 to M4 complete (Robocopy investigation, core library, pre-flight engine, WinForms UI). M5 (report screen, retry failed, resume on launch, saved credentials) in progress; M6 (manual test plan) to follow. Findings: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). Specification: [docs/SPEC.md](docs/SPEC.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
+> **Status:** M1 to M4 complete (Robocopy investigation, core library, pre-flight engine, WinForms UI). M5 (report screen, retry failed, resume on launch, saved credentials) built and tested, awaiting owner go-ahead; M6 (manual test plan) to follow. Findings: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). Specification: [docs/SPEC.md](docs/SPEC.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Target platforms
 
@@ -21,6 +21,9 @@ The tool is the single file `DataTransferTool.exe` (built at `src\DataTransferTo
 4. **Destination:** a folder on a USB or local drive, or a network share with user name and password. Press *Test destination*.
 5. **Pre-flight:** fix or acknowledge every warning, then *Start copy*.
 6. **Run:** wait for *Finished*. Files land in `<destination>\<COMPUTERNAME>\<drive>\<original path>`.
+7. **Report:** totals and the files that were not copied, with reasons. *Retry failed* tries them again; the list is also saved as a CSV in the log folder.
+
+If a copy is cancelled, the destination fills up, or the PC restarts, start the tool again from the same stick: it offers to resume the job. For a network share, tick *Save credentials for resume* so the password does not have to be typed again (it is stored encrypted, readable only by the same Windows account on the same PC).
 
 The job file (`DataTransferJob.json`) and logs (`Logs\`) are written next to the exe, or under `%ProgramData%\DataTransferTool` when that folder is read-only.
 

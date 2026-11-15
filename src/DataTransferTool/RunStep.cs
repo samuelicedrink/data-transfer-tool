@@ -72,7 +72,18 @@ namespace DataTransferTool
         public override string Subtitle => finished ? "" : "The copy runs without asking anything. Locked files are retried at the end; a lost destination is waited for.";
         public override bool CanGoBack => false;
         public override bool CanGoNext => finished;
-        public override string NextText => "Close";
+        public override string NextText => "Report >";
+
+        /// <summary>Lets the Report screen start the copy again (continue after a cancel or a full destination).</summary>
+        public void Reset()
+        {
+            started = finished = closeWhenDone = false;
+            cancelButton.Visible = true; cancelButton.Enabled = true; cancelButton.Text = "Cancel";
+            bar.Value = 0;
+            foreach (var l in new[] { jobLabel, filesLabel, bytesLabel, folderLabel, speedLabel, etaLabel, elapsedLabel }) l.Text = "";
+            statusLabel.ForeColor = SystemColors.ControlText;
+            Add("Continuing the job.");
+        }
 
         public override void OnEnter()
         {
@@ -103,6 +114,15 @@ namespace DataTransferTool
             var scan = State.Preflight?.Scan;
             cts = new CancellationTokenSource();
             State.Running = true;
+            // credentials for resume: written only when the technician asked for it, never in plain text
+            var creds = State.Store.Credentials;
+            if (State.SaveCredentials && job.DestinationUserName != null && State.Password != null)
+            {
+                try { creds.Save(job.Id, job.DestinationUserName, State.Password); Add("Credentials saved for resume (encrypted for this Windows account)."); }
+                catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException || ex is System.Security.Cryptography.CryptographicException)
+                { Add("Could not save the credentials for resume: " + ex.Message); }
+            }
+            else creds.Delete();
             var engine = new CopyEngine(job, State.Store.LogDirectory)
             {
                 Profiles = State.Profiles,
@@ -146,6 +166,18 @@ namespace DataTransferTool
             elapsedLabel.Text = Ui.Duration(p.Elapsed);
         }
 
+        /// <summary>Writes (or removes) the failures CSV in the log folder for the current job.</summary>
+        internal static void WriteFailuresCsv(AppState state)
+        {
+            string path = System.IO.Path.Combine(state.Store.LogDirectory, $"failures_{state.Job.ComputerName}_{state.Job.Id}.csv");
+            try
+            {
+                if (state.Job.AllFailures().Any()) { FailureCsv.Write(state.Job, path); state.FailuresCsv = path; }
+                else { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); state.FailuresCsv = null; }
+            }
+            catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { state.FailuresCsv = null; }
+        }
+
         void Add(string text)
         {
             messages.Items.Add($"{DateTime.Now:HH:mm:ss}  {text}");
@@ -180,7 +212,8 @@ namespace DataTransferTool
                               (State.Job.Sources.Any(s => s.CountsApproximate) ? "  (approximate after an interruption)" : "");
             bytesLabel.Text = $"{Ui.Size(t.BytesCopied)} copied";
             Add(headline);
-            foreach (var f in State.Job.AllFailures().Take(200)) Add($"Not copied: {f.SourcePath} - {f.Message} ({f.Category})");
+            WriteFailuresCsv(State);
+            if (State.FailuresCsv != null) Add("List of files not copied: " + State.FailuresCsv);
             if (error != null) Add("Error: " + error);
             RaiseButtonsChanged();
             if (closeWhenDone) CloseRequested?.Invoke();

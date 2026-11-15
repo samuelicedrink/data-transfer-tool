@@ -8,6 +8,28 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — M5 design choices (for owner review)
+
+- **Report** is a fifth screen after Run. It shows a Continue copy button when
+  the job did not finish (cancelled, destination full), and Retry failed when
+  it finished with failures. Retry failed runs immediately, without the
+  locked-file wait.
+- **Failures CSV** is written to the log folder automatically after every run
+  and retry (so it exists even if nobody presses a button), and removed when
+  nothing is failing any more. *Save CSV as* writes a copy elsewhere.
+- **Resume runs the pre-flight checks again**, because open applications, free
+  space or the destination may have changed since the job was interrupted.
+  Folders already finished are skipped; the folder that was interrupted is run
+  again and Robocopy skips its identical files.
+- **Start a new job** keeps the old job as a record: its file is moved to the
+  log folder and its saved credentials are deleted.
+- **Saved credentials** are bound to the Windows account and PC (DPAPI
+  CurrentUser) and to the job ID. A job resumed by another technician account
+  or on another PC simply asks for the password again.
+- **When credentials are deleted:** at the start of a copy if the box is not
+  ticked, when the job finishes, when a new job is started, and when the tool
+  closes unless the job can still be resumed and the box was ticked.
+
 ## 2026-11-15 — Owner approved M4
 
 The owner gave the go-ahead to merge M4 and start M5. M4 merged to `main` and

@@ -17,7 +17,9 @@ namespace DataTransferTool
         readonly Button backButton = Ui.Button("backButton", "< Back");
         readonly Button nextButton = Ui.Button("nextButton", "Next >");
         readonly RunStep runStep;
+        readonly DestinationStep destinationStep;
         int current = -1;
+        const int SelectIndex = 0, DestinationIndex = 1, PreflightIndex = 2, RunIndex = 3;
 
         public MainForm(JobStore store)
         {
@@ -31,7 +33,10 @@ namespace DataTransferTool
             MinimumSize = new Size(800, 560);
 
             runStep = new RunStep(state) { CloseRequested = () => BeginInvoke((Action)Close) };
-            steps = new StepControl[] { new SelectStep(state), new DestinationStep(state), new PreflightStep(state), runStep };
+            destinationStep = new DestinationStep(state);
+            var report = new ReportStep(state);
+            report.ContinueRequested = () => { runStep.Reset(); Go(RunIndex, forward: false); };
+            steps = new StepControl[] { new SelectStep(state), destinationStep, new PreflightStep(state), runStep, report };
             foreach (var s in steps) s.ButtonsChanged += UpdateButtons;
 
             var header = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, Padding = new Padding(14, 12, 14, 8), BackColor = SystemColors.Window, WrapContents = false };
@@ -57,13 +62,58 @@ namespace DataTransferTool
 
             backButton.Click += (s, e) => Go(current - 1, forward: false);
             nextButton.Click += (s, e) => Next();
-            Shown += (s, e) => Go(0, forward: true);
+            Shown += (s, e) => Start();
             FormClosing += OnClosing;
+        }
+
+        /// <summary>Offers to resume an unfinished job; otherwise starts on the Select screen.</summary>
+        void Start()
+        {
+            JobDefinition saved = null;
+            try { saved = state.Store.Load(); } catch (Exception) { }
+            if (saved == null || !saved.IsUnfinished)
+            {
+                // a finished job from an earlier session is kept as a record in the log folder
+                if (saved != null) try { state.Store.Archive(saved.Id); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                Go(SelectIndex, forward: true);
+                return;
+            }
+
+            var creds = state.Store.Credentials;
+            string user = null, password = null;
+            bool credsOk = saved.DestinationUserName != null && creds.TryLoad(saved.Id, out user, out password) && user == saved.DestinationUserName;
+            DialogResult answer;
+            using (var f = new ResumeForm(saved, credsOk)) answer = f.ShowDialog(this);
+            if (answer != DialogResult.Yes)
+            {
+                try { state.Store.Archive(saved.Id); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                Go(SelectIndex, forward: true);
+                return;
+            }
+
+            // resume: same job, same selections and destination; checks run again because the PC may have changed
+            state.Job = saved;
+            if (credsOk) { state.Password = password; state.SaveCredentials = true; }
+            Go(SelectIndex, forward: true);
+            Go(DestinationIndex, forward: true);
+            if (saved.DestinationUserName != null && state.Password == null)
+            {
+                destinationStep.ShowNotice($"Enter the password for {saved.DestinationUserName} to resume.");
+                return;
+            }
+            Go(PreflightIndex, forward: true);
         }
 
         void Next()
         {
-            if (current == steps.Length - 1) { Close(); return; }
+            if (current == steps.Length - 1)
+            {
+                // a finished job is archived to the log folder so the next launch starts clean
+                if (state.Job.State == JobState.Completed)
+                    try { state.Store.Archive(state.Job.Id); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                Close();
+                return;
+            }
             Go(current + 1, forward: true);
         }
 
@@ -105,6 +155,8 @@ namespace DataTransferTool
                 return;
             }
             foreach (var pf in state.AllPreflights) pf.RestartOneDrive();
+            // credentials stay on disk only for a job that can still be resumed, and only when asked for
+            if (!state.Job.IsUnfinished || !state.SaveCredentials) state.Store.Credentials.Delete();
             if (NetworkConnection.IsUnc(state.Job.DestinationRoot) && !string.IsNullOrEmpty(state.Job.DestinationUserName))
                 NetworkConnection.Disconnect(state.Job.DestinationRoot);
         }

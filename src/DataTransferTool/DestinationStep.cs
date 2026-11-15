@@ -17,6 +17,8 @@ namespace DataTransferTool
         readonly TextBox uncPathBox = Ui.TextBox("uncPathBox", 420);
         readonly TextBox userBox = Ui.TextBox("userBox", 260);
         readonly TextBox passwordBox = new TextBox { Name = "passwordBox", Width = 260, UseSystemPasswordChar = true, Margin = new Padding(3, 4, 3, 3) };
+        readonly CheckBox saveCredsCheck = new CheckBox { Name = "saveCredsCheck", AutoSize = true, Text = "Save credentials for resume (encrypted for this Windows account on this PC)", Margin = new Padding(3, 6, 3, 3) };
+        readonly Label noticeLabel = new Label { Name = "noticeLabel", AutoSize = true, ForeColor = Ui.Warning, Font = Ui.BoldFont, Margin = new Padding(3, 6, 3, 3) };
         readonly Button browseButton = Ui.Button("browseDestButton", "Browse...");
         readonly Button testButton = Ui.Button("testButton", "Test destination");
         readonly Label resultLabel = new Label { Name = "resultLabel", AutoSize = true, MaximumSize = new System.Drawing.Size(820, 0), Margin = new Padding(3, 10, 3, 3) };
@@ -42,10 +44,13 @@ namespace DataTransferTool
             grid.Controls.Add(networkRadio, 0, row); grid.SetColumnSpan(networkRadio, 3); row++;
             Add(Ui.Label("Share path:"), uncPathBox, Ui.Label(@"\\server\share\folder", null) );
             Add(Ui.Label("User name:"), userBox, Ui.Label(@"DOMAIN\name or name@domain. Empty: connect as the account running this tool."));
-            Add(Ui.Label("Password:"), passwordBox, Ui.Label("Kept in memory only."));
+            Add(Ui.Label("Password:"), passwordBox, Ui.Label("Kept in memory only, unless saved below."));
             ((Label)grid.GetControlFromPosition(2, 3)).ForeColor = Ui.Muted;
             ((Label)grid.GetControlFromPosition(2, 4)).ForeColor = Ui.Muted;
             ((Label)grid.GetControlFromPosition(2, 5)).ForeColor = Ui.Muted;
+            grid.Controls.Add(saveCredsCheck, 1, row); grid.SetColumnSpan(saveCredsCheck, 2); row++;
+            grid.Controls.Add(noticeLabel, 0, row); grid.SetColumnSpan(noticeLabel, 3); row++;
+            saveCredsCheck.CheckedChanged += (s, e) => State.SaveCredentials = saveCredsCheck.Checked;
 
             var bottom = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(0, 10, 0, 0) };
             bottom.Controls.Add(testButton);
@@ -62,7 +67,13 @@ namespace DataTransferTool
 
             localRadio.CheckedChanged += (s, e) => UpdateEnabled();
             networkRadio.CheckedChanged += (s, e) => UpdateEnabled();
-            foreach (var t in new[] { localPathBox, uncPathBox, userBox, passwordBox }) t.TextChanged += (s, e) => { resultLabel.Text = ""; UpdateLayoutText(); RaiseButtonsChanged(); };
+            foreach (var t in new[] { localPathBox, uncPathBox, userBox, passwordBox }) t.TextChanged += (s, e) => { resultLabel.Text = ""; noticeLabel.Text = ""; UpdateLayoutText(); RaiseButtonsChanged(); };
+            userBox.TextChanged += (s, e) =>
+            {
+                bool can = networkRadio.Checked && userBox.Text.Trim().Length > 0;
+                saveCredsCheck.Enabled = can;
+                if (!can) saveCredsCheck.Checked = false;
+            };
             browseButton.Click += (s, e) =>
             {
                 using (var d = new FolderBrowserDialog { Description = "Destination folder", ShowNewFolderButton = true })
@@ -86,6 +97,7 @@ namespace DataTransferTool
                 networkRadio.Checked = unc; localRadio.Checked = !unc;
                 userBox.Text = job.DestinationUserName ?? "";
                 passwordBox.Text = State.Password ?? "";
+                saveCredsCheck.Checked = State.SaveCredentials;
             }
             else if (localPathBox.Text.Length == 0)
             {
@@ -151,10 +163,16 @@ namespace DataTransferTool
             resultLabel.Text = text;
         }
 
+        /// <summary>Shown when a resumed job needs its password typed again.</summary>
+        public void ShowNotice(string text) => noticeLabel.Text = text;
+
         void UpdateEnabled()
         {
             localPathBox.Enabled = browseButton.Enabled = localRadio.Checked;
             uncPathBox.Enabled = userBox.Enabled = passwordBox.Enabled = networkRadio.Checked;
+            // only a network destination with its own user name has credentials to save
+            saveCredsCheck.Enabled = networkRadio.Checked && userBox.Text.Trim().Length > 0;
+            if (!saveCredsCheck.Enabled) saveCredsCheck.Checked = false;
             resultLabel.Text = "";
             UpdateLayoutText();
             RaiseButtonsChanged();

@@ -35,10 +35,13 @@ static class Program
         Directory.CreateDirectory(shots);
         try
         {
-            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABC";
+            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEF"; // D resumes the job C leaves behind
             if (only.Contains("A")) ScenarioA();
             if (only.Contains("B")) ScenarioB();
             if (only.Contains("C")) ScenarioC();
+            if (only.Contains("D")) ScenarioD();
+            if (only.Contains("E")) ScenarioE();
+            if (only.Contains("F")) ScenarioF();
         }
         catch (Exception ex) { Fail("crashed: " + ex); Shot("error"); }
         finally { try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { } }
@@ -115,8 +118,17 @@ static class Program
         Check(json.Contains("\"State\":2") || json.Contains("\"State\": 2"), "saved job beside the exe says Completed");
         Check(!json.ToLowerInvariant().Contains("password"), "saved job contains no password field");
 
+        Next();
+        Check(Text("titleLabel") == "Report", "Report screen");
+        Check(Text("outcomeLabel") == "Everything was copied.", "report outcome: " + Text("outcomeLabel"));
+        var rows = ReportRows("totalsList");
+        Check(rows.Count == 3 && rows[2][0].StartsWith("Total") && rows[2][1].StartsWith("529 ") && rows[2][3] == "0", "totals per folder job and overall: " + string.Join(" | ", rows.Select(r => string.Join(" / ", r))));
+        Check(Text("failuresLabel") == "No files failed." && !Id("retryButton").Current.IsEnabled, "no failures, Retry failed disabled");
+        Shot("8-report");
         Invoke(Id("nextButton")); // Close
         Check(proc.WaitForExit(15000), "Close exits the tool");
+        Check(!File.Exists(jobFile) && Directory.GetFiles(Path.Combine(Path.GetDirectoryName(exe), "Logs"), "job_*.json").Length > 0,
+              "the finished job is moved to the log folder, so the next launch starts clean");
         Wipe(dest);
     }
 
@@ -163,10 +175,202 @@ static class Program
         Check(Text("statusLabel").StartsWith("Cancelled."), "status: " + Text("statusLabel"));
         Check(Process.GetProcessesByName("robocopy").Length == 0, "no Robocopy left running");
         Check(NoOtherWindows(), "no dialog appeared");
+
+        Next();
+        Check(Text("outcomeLabel").StartsWith("The copy was cancelled."), "report says cancelled");
+        var cont = Id("continueButton");
+        Check(!cont.Current.IsOffscreen && cont.Current.IsEnabled, "Continue copy is offered");
+        Shot("9-report-cancelled");
+        Click(cont);
+        Check(WaitFor(() => Text("titleLabel") == "Copying" || Text("titleLabel") == "Copy finished", 10), "Continue copy goes back to the Run screen");
+        Check(WaitFor(() => Id("nextButton").Current.IsEnabled, 300), "continued copy finishes");
+        Check(Text("statusLabel") == "Finished: everything was copied.", "status: " + Text("statusLabel"));
+        Next();
+        Check(Text("outcomeLabel") == "Everything was copied.", "report after continuing: " + Text("outcomeLabel"));
+        int n = Directory.GetFiles(Path.Combine(dest, Environment.MachineName), "*", SearchOption.AllDirectories).Length;
+        Check(n == 40000, $"all 40,000 files at the destination after continuing ({n})");
         Invoke(Id("nextButton"));
         Check(proc.WaitForExit(15000), "tool exits");
         Wipe(dest);
     }
+
+    /// <summary>Relaunch after scenario C left a cancelled job: the tool offers to resume it.</summary>
+    static void ScenarioD()
+    {
+        Console.WriteLine("== D: resume offered at start-up");
+        string dest = Path.Combine(work, "ui_dest_c");
+        string jobFile = Path.Combine(Path.GetDirectoryName(exe), "DataTransferJob.json");
+        Check(File.Exists(jobFile), "a cancelled job is saved beside the exe");
+        Launch(keepJob: true);
+        AutomationElement dlg = null;
+        Check(WaitFor(() => (dlg = win.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, "ResumeForm"))
+                                ?? AutomationElement.RootElement.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.AutomationIdProperty, "ResumeForm"))) != null, 15),
+              "resume is offered");
+        if (dlg == null) return;
+        string info = Id("resumeInfo", dlg).Current.Name;
+        Console.WriteLine("   " + info.Replace("\r\n", "\r\n   "));
+        Check(info.Contains("it was cancelled") && info.Contains("src_tiny") && info.Contains(dest), "the offer describes the job");
+        Shot("10-resume", dlg);
+        Invoke(Id("resumeButton", dlg));
+        Check(WaitFor(() => Text("titleLabel") == "Pre-flight checks", 15), "resume goes straight to the pre-flight checks");
+        Preflight(screenshot: false);
+        Next();
+        Check(WaitFor(() => Id("nextButton").Current.IsEnabled, 300), "resumed copy finishes");
+        Check(Text("statusLabel") == "Finished: everything was copied.", "status: " + Text("statusLabel"));
+        Next();
+        Check(Text("outcomeLabel") == "Everything was copied.", "report: " + Text("outcomeLabel"));
+        var total = ReportRows("totalsList").Last();
+        Console.WriteLine("   totals: " + string.Join(" / ", total));
+        int n = Directory.GetFiles(Path.Combine(dest, Environment.MachineName), "*", SearchOption.AllDirectories).Length;
+        Check(n == 40000, $"all 40,000 files at the destination after resuming ({n})");
+        Invoke(Id("nextButton"));
+        Check(proc.WaitForExit(15000), "tool exits");
+        Check(!File.Exists(jobFile), "the finished job no longer waits to be resumed");
+        Wipe(dest);
+    }
+
+    /// <summary>One file stays locked: it is reported with its reason and in the CSV; Retry failed copies it once released.</summary>
+    static void ScenarioE()
+    {
+        Console.WriteLine("== E: failure report, CSV and Retry failed");
+        string src = Path.Combine(work, "src_lock"), dest = Path.Combine(work, "ui_dest_e");
+        Wipe(dest);
+        Directory.CreateDirectory(src);
+        var rng = new Random(4);
+        for (int i = 0; i < 20; i++) { var b = new byte[3000]; rng.NextBytes(b); File.WriteAllBytes(Path.Combine(src, $"doc {i}.txt"), b); }
+        string locked = Path.Combine(src, "locked report.docx");
+        File.WriteAllBytes(locked, Enumerable.Range(0, 5000).Select(i => (byte)i).ToArray());
+        var hold = new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        try
+        {
+            Launch();
+            TickFolder(src);
+            OptionsBackupOff(screenshot: false);
+            Next();
+            SetValue(Id("localPathBox"), dest);
+            Next();
+            Preflight(screenshot: false);
+            Next();
+            Check(WaitFor(() => Id("nextButton").Current.IsEnabled, 120), "copy finishes (main pass, wait, locked-file retry)");
+            Check(Text("statusLabel") == "Finished with 1 file(s) not copied.", "status: " + Text("statusLabel"));
+            Next();
+            var fails = ReportRows("failuresList");
+            Check(fails.Count == 1 && fails[0][0] == locked && fails[0][1] == "File was open in another program" && fails[0][2].Contains("error 32"),
+                  "the locked file is listed with its reason: " + string.Join(" | ", fails.Select(r => string.Join(" / ", r))));
+            string csvText = Text("csvLabel");
+            string csv = csvText.StartsWith("CSV: ") ? csvText.Substring(5) : "";
+            var lines = File.Exists(csv) ? File.ReadAllLines(csv) : new string[0];
+            Check(lines.Length == 2 && lines[1].Contains(locked) && lines[1].Contains("File was open in another program") && lines[1].Contains("\"32\""),
+                  "failures CSV written to the log folder with the reason: " + Path.GetFileName(csv));
+            Check(Id("retryButton").Current.IsEnabled, "Retry failed is offered");
+            Shot("11-report-failure");
+
+            hold.Dispose(); hold = null; // the user closes the document
+            Click(Id("retryButton"));
+            Check(WaitFor(() => Text("outcomeLabel") == "Everything was copied.", 60), "after Retry failed: " + Text("outcomeLabel"));
+            Check(Text("failuresLabel") == "No files failed." && Text("reportActivityLabel").StartsWith("Retry finished: 1 of 1 now copied"), "report updated: " + Text("reportActivityLabel"));
+            string copied = Path.Combine(dest, Environment.MachineName, src.Substring(0, 1).ToUpperInvariant(), src.Substring(3), "locked report.docx");
+            Check(File.Exists(copied) && Hash(copied) == Hash(locked), "the retried file is at the destination, identical");
+            Check(!File.Exists(csv) && Text("csvLabel") == "", "the CSV is removed once nothing is failing");
+            Shot("12-report-after-retry");
+            Invoke(Id("nextButton"));
+            Check(proc.WaitForExit(15000), "tool exits");
+        }
+        finally { hold?.Dispose(); }
+        Wipe(dest);
+    }
+
+    /// <summary>
+    /// Resume of a network job, with and without saved credentials. The share does not exist, so the
+    /// copy never starts; what is tested is how the saved credentials are used on resume.
+    /// </summary>
+    static void ScenarioF()
+    {
+        Console.WriteLine("== F: resume with and without saved credentials");
+        string dir = Path.GetDirectoryName(exe);
+        string jobFile = Path.Combine(dir, "DataTransferJob.json"), credFile = Path.Combine(dir, "DataTransferJob.credentials");
+        const string id = "uitestf00001", user = @"TESTPC\nobody", password = "Ui-Test-Secret-9!";
+        string json = "{\"Id\":\"" + id + "\",\"ComputerName\":\"" + Environment.MachineName + "\",\"DestinationRoot\":\"\\\\\\\\127.0.0.1\\\\dtt-no-such-share\\\\Export\"," +
+                      "\"DestinationUserName\":\"TESTPC\\\\nobody\",\"State\":3,\"Options\":{\"BackupMode\":false,\"ExcludeCloudOnly\":true,\"Threads\":8,\"Retries\":1,\"WaitSeconds\":2," +
+                      "\"ExcludeFiles\":[\"desktop.ini\"],\"ExcludeProfileDirs\":[\"AppData\"],\"ExcludeDirNames\":[],\"LockedRetryDelaySeconds\":10,\"DestinationPollSeconds\":3}," +
+                      "\"Sources\":[{\"Path\":\"" + small.Replace("\\", "\\\\") + "\",\"Status\":0,\"ExcludedSubfolders\":[],\"Failures\":[]}]}";
+        File.WriteAllText(jobFile, json);
+        // the same DPAPI format the tool writes: user \0 password, CurrentUser scope, bound to the job id
+        File.WriteAllBytes(credFile, System.Security.Cryptography.ProtectedData.Protect(
+            System.Text.Encoding.UTF8.GetBytes(user + "\0" + password), System.Text.Encoding.UTF8.GetBytes("DataTransferTool/" + id),
+            System.Security.Cryptography.DataProtectionScope.CurrentUser));
+        try
+        {
+            // 1. credentials saved: no password prompt, straight to the checks
+            Launch(keepJob: true);
+            var dlg = WaitForDialog("ResumeForm");
+            Check(dlg != null && Id("resumeInfo", dlg).Current.Name.Contains("Credentials:   saved for resume"), "the offer says the credentials are saved");
+            if (dlg == null) return;
+            Invoke(Id("resumeButton", dlg));
+            Check(WaitFor(() => Text("titleLabel") == "Pre-flight checks", 15), "with saved credentials, resume skips the password prompt");
+            Check(WaitFor(() => Id("rerunButton").Current.IsEnabled, 120), "checks finish");
+            var dest = Rows().First(r => r[1].StartsWith("Destination"));
+            Check(dest[0] == "FAIL (must fix)" && dest[2].Contains(@"Could not connect to \\127.0.0.1\dtt-no-such-share as " + user),
+                  "the saved user name was used to connect: " + First(dest[2]));
+            Check(!AllText().Contains(password), "the password is not shown anywhere in the window");
+            ((WindowPattern)win.GetCurrentPattern(WindowPattern.Pattern)).Close();
+            Check(proc.WaitForExit(15000), "tool exits");
+            Check(File.Exists(credFile) && File.Exists(jobFile), "job and saved credentials are kept for the next resume");
+            Check(!File.ReadAllText(jobFile).Contains(password), "the job file does not contain the password");
+
+            // 2. no saved credentials: the tool asks for the password on the Destination screen
+            File.Delete(credFile);
+            Launch(keepJob: true);
+            dlg = WaitForDialog("ResumeForm");
+            Check(dlg != null && Id("resumeInfo", dlg).Current.Name.Contains("not saved - you will be asked for the password"), "the offer says the password will be needed");
+            if (dlg == null) return;
+            Invoke(Id("resumeButton", dlg));
+            Check(WaitFor(() => Text("titleLabel") == "Choose the destination", 15), "without saved credentials, resume stops on the Destination screen");
+            Check(Text("noticeLabel") == "Enter the password for " + user + " to resume.", "and asks for the password: " + Text("noticeLabel"));
+            Check(Value(Id("uncPathBox")) == @"\\127.0.0.1\dtt-no-such-share\Export" && Value(Id("userBox")) == user, "share and user name are filled in");
+            Shot("13-resume-needs-password");
+            ((WindowPattern)win.GetCurrentPattern(WindowPattern.Pattern)).Close();
+            Check(proc.WaitForExit(15000), "tool exits");
+            Check(!File.Exists(credFile), "nothing is saved when the box was not ticked");
+        }
+        finally
+        {
+            foreach (var f in new[] { jobFile, credFile }) if (File.Exists(f)) File.Delete(f);
+        }
+    }
+
+    static AutomationElement WaitForDialog(string id)
+    {
+        AutomationElement dlg = null;
+        WaitFor(() => (dlg = win.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.AutomationIdProperty, id))
+                             ?? AutomationElement.RootElement.FindFirst(TreeScope.Children, new PropertyCondition(AutomationElement.AutomationIdProperty, id))) != null, 15);
+        return dlg;
+    }
+
+    /// <summary>Every name and value in the window, to check that a secret is not displayed.</summary>
+    static string AllText()
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (AutomationElement e in win.FindAll(TreeScope.Descendants, Condition.TrueCondition))
+        {
+            try
+            {
+                sb.Append(e.Current.Name).Append('\n');
+                if (e.TryGetCurrentPattern(ValuePattern.Pattern, out object v)) sb.Append(((ValuePattern)v).Current.Value).Append('\n');
+                if (e.TryGetCurrentPattern(TextPattern.Pattern, out object t)) sb.Append(((TextPattern)t).DocumentRange.GetText(-1)).Append('\n');
+            }
+            catch (ElementNotAvailableException) { }
+            catch (InvalidOperationException) { }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>The cells of each row of a details-view list.</summary>
+    static List<string[]> ReportRows(string listId) =>
+        Id(listId).FindAll(TreeScope.Descendants, new OrCondition(
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.DataItem)))
+        .Cast<AutomationElement>().Select(RowOf).ToList();
 
     static void ScenarioC()
     {
@@ -190,7 +394,7 @@ static class Program
         Check(Process.GetProcessesByName("robocopy").Length == 0, "no Robocopy left running");
         string json = File.ReadAllText(Path.Combine(Path.GetDirectoryName(exe), "DataTransferJob.json"));
         Check(json.Contains("\"State\":3") || json.Contains("\"State\": 3"), "saved job says Cancelled (can be resumed)");
-        Wipe(dest);
+        // the partial copy and the job stay for scenario D, which resumes them
     }
 
     // ------------------------------------------------------------ wizard helpers
@@ -216,16 +420,18 @@ static class Program
         return dir;
     }
 
-    static void Launch()
+    static void Launch(bool keepJob = false)
     {
         foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(exe))) { try { p.Kill(); p.WaitForExit(5000); } catch { } }
-        string jobFile = Path.Combine(Path.GetDirectoryName(exe), "DataTransferJob.json");
-        if (File.Exists(jobFile)) File.Delete(jobFile);
+        string dir = Path.GetDirectoryName(exe);
+        if (!keepJob)
+            foreach (var f in new[] { "DataTransferJob.json", "DataTransferJob.credentials" })
+                if (File.Exists(Path.Combine(dir, f))) File.Delete(Path.Combine(dir, f));
         proc = Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe) });
         proc.WaitForInputIdle(20000);
         for (int i = 0; i < 100 && proc.MainWindowHandle == IntPtr.Zero; i++) { Thread.Sleep(100); proc.Refresh(); }
         win = AutomationElement.FromHandle(proc.MainWindowHandle);
-        WaitFor(() => Text("titleLabel") == "Select folders", 15);
+        if (!keepJob) WaitFor(() => Text("titleLabel") == "Select folders", 15);
     }
 
     static void TickFolder(string path)
