@@ -9,6 +9,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts\Build-Release.ps1` stopped at `git worktree add` under Windows PowerShell 5.1, which treats git's progress messages as errors; it now checks git's exit code instead.
+
 ## [1.0.0] - 2026-11-15
 
 First release (milestones M1 to M6). The manual tests in `MANUAL_TESTS.md` have not been run yet; use this version only on test PCs until they pass.

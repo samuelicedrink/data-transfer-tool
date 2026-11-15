@@ -23,9 +23,15 @@ $repo = (git -C $PSScriptRoot rev-parse --show-toplevel).Trim()
 $commit = (git -C $repo rev-parse --verify "$Ref^{commit}").Trim()
 if ($LASTEXITCODE -ne 0 -or -not $commit) { throw "Unknown ref: $Ref" }
 
+# Windows PowerShell 5.1 turns git's progress messages on stderr into errors; judge by exit code.
+function Invoke-Git {
+  $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+  try { $out = & git -C $repo @args 2>&1 } finally { $ErrorActionPreference = $old }
+  if ($LASTEXITCODE -ne 0) { throw "git $($args -join ' ') failed: $out" }
+}
+
 $work = Join-Path ([IO.Path]::GetTempPath()) "dtt_release_$Name`_$PID"
-git -C $repo worktree add --detach $work $commit 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "git worktree add failed" }
+Invoke-Git worktree add --detach $work $commit
 try {
   dotnet build (Join-Path $work 'src\DataTransferTool') -c Release -nologo -v q
   if ($LASTEXITCODE -ne 0) { throw "Build failed for $Ref" }
@@ -39,5 +45,5 @@ try {
     Set-Content -Encoding ASCII (Join-Path $out 'BUILD.txt')
   "Built $Ref ($($commit.Substring(0,7)), version $ver) into $out"
 } finally {
-  git -C $repo worktree remove --force $work 2>&1 | Out-Null
+  Invoke-Git worktree remove --force $work
 }
