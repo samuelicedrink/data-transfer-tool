@@ -9,6 +9,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-15
+
+First release (milestones M1 to M6). The manual tests in `MANUAL_TESTS.md` have not been run yet; use this version only on test PCs until they pass.
+
 ### Added
 
 - Initial repository structure: README, change log, `.gitignore`, `.gitattributes`.
@@ -41,6 +45,8 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Changed
 
+- `scripts\Build-Release.ps1`: builds a tag or branch into `release\v1\` or `release\v2\` (not committed) so both versions are available side by side.
+- The window title shows the version (`Data Transfer Tool v1.0.0 - <PC>`) so v1 and v2 can be told apart. Exe version set to 1.0.0.
 - Flag set after M1 testing (approved by the owner 2026-11-14): add `/BYTES` (exact byte counts; default output prints rounded sizes such as `1.7 m`), add `/FP` (same file-line shape with and without `/MT`) and add `/XA:O` (excludes cloud-only OneDrive files, verified on Windows 11 build 26200). No spec flag removed.
 
 ### Test findings (M1, 2026-11-14, not elevated and elevated)
