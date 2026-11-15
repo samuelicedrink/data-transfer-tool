@@ -37,4 +37,8 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 - A `/L` scan does not name a folder it cannot read, with or without `/MT`; it only counts it in the summary. The scan result therefore carries a count of unreadable folders, not their paths.
 - Destination loss was tested by removing a SUBST drive mapping mid-run: the engine stops Robocopy, waits, relaunches when the destination returns, and the tree verifies by hash with no failures left over.
-- Destination-full and real volume removal are covered by two tests that need an elevated prompt (they create a virtual disk); not yet run.
+- Elevated run (owner, same day) on a virtual disk: both tests pass. Destination full: Robocopy does not stop by itself (100 `ERROR 112` lines in under 2 s), the engine stops it and reports. Volume detached mid-run: errors 433, 21 and a negative driver code; the engine paused and finished after the volume returned, all files verified. Logs kept as fixtures in `tests/fixtures/m2`.
+
+### Fixed
+
+- Parser now reads negative Robocopy error codes and treats error 433 (device does not exist) as destination loss; both were found in the real volume-removal log.

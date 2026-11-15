@@ -22,7 +22,7 @@ namespace DataTransfer.Core
     /// </summary>
     public sealed class RobocopyLogParser
     {
-        static readonly Regex ErrorRx = new Regex(@"^(?<ts>\d{4}/\d\d/\d\d \d\d:\d\d:\d\d) ERROR (?<code>\d+) \(0x[0-9A-Fa-f]{8}\) (?<rest>.+)$", RegexOptions.Compiled);
+        static readonly Regex ErrorRx = new Regex(@"^(?<ts>\d{4}/\d\d/\d\d \d\d:\d\d:\d\d) ERROR (?<code>-?\d+) \(0x[0-9A-Fa-f]{8}\) (?<rest>.+)$", RegexOptions.Compiled);
         static readonly Regex FileRx = new Regex(@"^\t\s*(?<cls>\*?[A-Za-z][A-Za-z ]*?)\s*\t\t\s*(?<size>\d+(?:\.\d+)?(?: [kmgt])?)(?: (?<ts>\d{4}/\d\d/\d\d \d\d:\d\d:\d\d))?\t(?<path>.*)$", RegexOptions.Compiled);
         static readonly Regex DirRx = new Regex(@"^\t *(?<cls>\*?[A-Za-z][A-Za-z ]*?) +(?<count>-?\d+)\t(?<path>.*)$", RegexOptions.Compiled);
         static readonly Regex SummaryRx = new Regex(@"^\s*(?<row>Dirs|Files|Bytes)\s*:\s+(?<vals>\d.*)$", RegexOptions.Compiled);
@@ -36,7 +36,7 @@ namespace DataTransfer.Core
 
         static readonly HashSet<int> DiskFullCodes = new HashSet<int> { 112, 39 };
         /// <summary>Errors that mean the destination itself is gone.</summary>
-        static readonly HashSet<int> DestinationGoneCodes = new HashSet<int> { 21, 53, 55, 59, 64, 67, 121, 1167, 1231, 1232, 1256 };
+        static readonly HashSet<int> DestinationGoneCodes = new HashSet<int> { 21, 53, 55, 59, 64, 67, 121, 433, 1167, 1231, 1232, 1256 };
         /// <summary>Errors that may mean it; the engine probes the destination when it sees one.</summary>
         static readonly HashSet<int> DestinationSuspectCodes = new HashSet<int> { 2, 3, 15, 31, 1006, 1117 };
 
@@ -165,7 +165,8 @@ namespace DataTransfer.Core
             if (isDir && path.Length > 3) path = path.TrimEnd('\\');
 
             if (DiskFullCodes.Contains(code)) DiskFullErrors++;
-            if (DestinationGoneCodes.Contains(code) || DestinationSuspectCodes.Contains(code)) DestinationSuspectErrors++;
+            // negative codes are driver/NTSTATUS-style failures (seen when a virtual disk was detached)
+            if (code < 0 || DestinationGoneCodes.Contains(code) || DestinationSuspectCodes.Contains(code)) DestinationSuspectErrors++;
 
             if (!failures.TryGetValue(path, out var f))
             {

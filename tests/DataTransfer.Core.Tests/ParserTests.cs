@@ -204,6 +204,34 @@ namespace DataTransfer.Core.Tests
         public void ParseSize(string text, long expected) => Assert.That(RobocopyLogParser.ParseSize(text), Is.EqualTo(expected));
 
         [Test]
+        public void DiskFull_RealLog_Error112IsFlagged_AndRobocopyDoesNotStopByItself()
+        {
+            // captured from a 200 MB virtual disk: Robocopy kept going and logged 100 failures in under 2 s
+            var p = Parse(@"m2\diskfull_killed.log");
+            Assert.That(p.DiskFullErrors, Is.EqualTo(100));
+            Assert.That(p.Failures.Count, Is.GreaterThan(40));
+            Assert.That(p.Failures.All(f => f.Category == FailureCategory.DiskFull && f.ErrorCode == 112));
+            Assert.That(p.Failures.First().Message, Does.Contain("not enough space"));
+            Assert.That(p.HasSummary, Is.False, "the engine killed it");
+        }
+
+        [Test]
+        public void VolumeRemoved_RealLog_DeviceErrorsAreFlagged_IncludingNegativeCodes()
+        {
+            // captured while a virtual disk was detached mid-run
+            var p = Parse(@"m2\volume_removed_killed.log");
+            var codes = p.Failures.Select(f => f.ErrorCode).Distinct().OrderBy(c => c).ToList();
+            Assert.That(codes, Is.EquivalentTo(new[] { -1069940708, 21, 433 }));
+            Assert.That(p.DestinationSuspectErrors, Is.EqualTo(p.ErrorLines).And.EqualTo(52));
+            Assert.That(p.Failures.Where(f => f.ErrorCode > 0).All(f => f.Category == FailureCategory.DestinationUnavailable));
+            Assert.That(p.DiskFullErrors, Is.EqualTo(0));
+
+            var resume = Parse(@"m2\volume_removed_resume.log");
+            Assert.That(resume.Failures, Is.Empty);
+            Assert.That(resume.Files, Is.EqualTo(new long[] { 5006, 53, 4953, 0, 0, 0 }), "relaunch skipped what was already there");
+        }
+
+        [Test]
         public void SyntheticDestinationErrors_AreFlagged()
         {
             // constructed lines in Robocopy's error format; real captures of these need hardware (see MANUAL tests)
