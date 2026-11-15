@@ -138,6 +138,8 @@ namespace DataTransfer.Core
         [DataMember] public DateTime? StartedUtc { get; set; }
         [DataMember] public DateTime? FinishedUtc { get; set; }
         [DataMember] public string LastMessage { get; set; }
+        /// <summary>v2: SID of the user picked on the Select step (null = all users). Only a SID, never a name.</summary>
+        [DataMember] public string SelectedUserSid { get; set; }
 
         [OnDeserialized]
         void Fix(StreamingContext c)

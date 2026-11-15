@@ -17,7 +17,7 @@ The tool is the single file `DataTransferTool.exe` (built at `src\DataTransferTo
 
 1. Copy `DataTransferTool.exe` to a USB stick.
 2. On the PC to export, double-click it and accept the administrator prompt.
-3. **Select:** tick folders, or press *Tick user data* for Desktop, Documents, Pictures and Downloads of every profile.
+3. **Select:** tick folders, or press *Tick user data* for Desktop, Documents, Pictures and Downloads of every profile. In v2, the **User** list at the top left shows everyone who has signed in on this PC with their access level (Local admin, Standard user, or unknown with the reason) and whether they are signed in now; picking a user makes *Tick user data* tick only that user's folders.
 4. **Destination:** a folder on a USB or local drive, or a network share with user name and password. Press *Test destination*.
 5. **Pre-flight:** fix or acknowledge every warning, then *Start copy*.
 6. **Run:** wait for *Finished*. Files land in `<destination>\<COMPUTERNAME>\<drive>\<original path>`.
