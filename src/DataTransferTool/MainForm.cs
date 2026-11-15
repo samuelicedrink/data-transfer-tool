@@ -1,0 +1,111 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+using DataTransfer.Core;
+
+namespace DataTransferTool
+{
+    /// <summary>The wizard: Select, Destination, Pre-flight, Run.</summary>
+    internal sealed class MainForm : Form
+    {
+        readonly AppState state;
+        readonly StepControl[] steps;
+        readonly Panel content = new Panel { Dock = DockStyle.Fill };
+        readonly Label titleLabel = new Label { Name = "titleLabel", AutoSize = true, Font = Ui.TitleFont, Margin = new Padding(0) };
+        readonly Label subtitleLabel = new Label { Name = "subtitleLabel", AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(0, 4, 0, 0) };
+        readonly Label stepLabel = new Label { Name = "stepLabel", AutoSize = true, ForeColor = Ui.Muted, Anchor = AnchorStyles.Left, Margin = new Padding(12, 10, 3, 3) };
+        readonly Button backButton = Ui.Button("backButton", "< Back");
+        readonly Button nextButton = Ui.Button("nextButton", "Next >");
+        readonly RunStep runStep;
+        int current = -1;
+
+        public MainForm(JobStore store)
+        {
+            state = new AppState { Store = store };
+            Text = $"Data Transfer Tool - {Environment.MachineName}";
+            Name = "MainForm";
+            Font = Ui.BaseFont;
+            AutoScaleMode = AutoScaleMode.Dpi;
+            StartPosition = FormStartPosition.CenterScreen;
+            Size = new Size(980, 680);
+            MinimumSize = new Size(800, 560);
+
+            runStep = new RunStep(state) { CloseRequested = () => BeginInvoke((Action)Close) };
+            steps = new StepControl[] { new SelectStep(state), new DestinationStep(state), new PreflightStep(state), runStep };
+            foreach (var s in steps) s.ButtonsChanged += UpdateButtons;
+
+            var header = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, FlowDirection = FlowDirection.TopDown, Padding = new Padding(14, 12, 14, 8), BackColor = SystemColors.Window, WrapContents = false };
+            header.Controls.Add(titleLabel);
+            header.Controls.Add(subtitleLabel);
+            var rule = new Label { Dock = DockStyle.Top, Height = 1, BackColor = SystemColors.ControlDark };
+
+            var footer = new TableLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 3, Padding = new Padding(8, 6, 8, 8) };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            footer.Controls.Add(stepLabel, 0, 0);
+            footer.Controls.Add(backButton, 1, 0);
+            footer.Controls.Add(nextButton, 2, 0);
+            var rule2 = new Label { Dock = DockStyle.Bottom, Height = 1, BackColor = SystemColors.ControlDark };
+
+            Controls.Add(content);
+            Controls.Add(rule);
+            Controls.Add(header);
+            Controls.Add(rule2);
+            Controls.Add(footer);
+            AcceptButton = null;
+
+            backButton.Click += (s, e) => Go(current - 1, forward: false);
+            nextButton.Click += (s, e) => Next();
+            Shown += (s, e) => Go(0, forward: true);
+            FormClosing += OnClosing;
+        }
+
+        void Next()
+        {
+            if (current == steps.Length - 1) { Close(); return; }
+            Go(current + 1, forward: true);
+        }
+
+        void Go(int index, bool forward)
+        {
+            if (index < 0 || index >= steps.Length) return;
+            if (current >= 0 && !steps[current].OnLeaving(forward)) return;
+            current = index;
+            var step = steps[current];
+            content.SuspendLayout();
+            content.Controls.Clear();
+            content.Controls.Add(step);
+            content.ResumeLayout();
+            titleLabel.Text = step.Title;
+            subtitleLabel.Text = step.Subtitle;
+            stepLabel.Text = $"Step {current + 1} of {steps.Length}";
+            step.OnEnter();
+            UpdateButtons();
+        }
+
+        void UpdateButtons()
+        {
+            if (current < 0) return;
+            var step = steps[current];
+            backButton.Enabled = current > 0 && step.CanGoBack;
+            nextButton.Text = step.NextText;
+            nextButton.Enabled = step.CanGoNext;
+            subtitleLabel.Text = step.Subtitle;
+        }
+
+        void OnClosing(object sender, FormClosingEventArgs e)
+        {
+            // closing the window during a run cancels it cleanly instead of asking anything
+            if (state.Running)
+            {
+                e.Cancel = true;
+                runStep.CancelAndClose();
+                return;
+            }
+            foreach (var pf in state.AllPreflights) pf.RestartOneDrive();
+            if (NetworkConnection.IsUnc(state.Job.DestinationRoot) && !string.IsNullOrEmpty(state.Job.DestinationUserName))
+                NetworkConnection.Disconnect(state.Job.DestinationRoot);
+        }
+    }
+}
