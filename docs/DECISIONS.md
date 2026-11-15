@@ -8,6 +8,11 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — Owner approved M4
+
+The owner gave the go-ahead to merge M4 and start M5. M4 merged to `main` and
+tagged `m4`.
+
 ## 2026-11-14 — Owner confirmed two M4 choices
 
 - A folder whose subfolders are all ticked by hand, but which was not ticked
