@@ -1,0 +1,40 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Bb]uild/
+[Dd]ist/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+ARM64/
+
+# Binaries and installers
+*.exe
+*.dll
+*.pdb
+*.msi
+*.msix
+*.appx
+*.obj
+*.lib
+*.ilk
+*.exp
+
+# Visual Studio / IDEs
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs, secrets
+*.log
+.env
