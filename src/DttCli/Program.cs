@@ -23,9 +23,12 @@ namespace DttCli
             Console.WriteLine($"job file: {store.JobFile}");
 
             JobDefinition job;
-            if (verb == "scan" || verb == "run")
+            if (verb == "scan" || verb == "run" || verb == "preflight")
             {
-                job = new JobDefinition { DestinationRoot = Value(args, "--dest") };
+                job = new JobDefinition { DestinationRoot = Value(args, "--dest"), DestinationUserName = Value(args, "--user") };
+                if (Values(args, "--only-app").Any()) job.Preflight.KnownApps = Values(args, "--only-app").ToList(); // replaces the list
+                foreach (var a in Values(args, "--app")) job.Preflight.KnownApps.Add(a);
+                if (Value(args, "--close-timeout") != null) job.Preflight.AppCloseTimeoutSeconds = int.Parse(Value(args, "--close-timeout"));
                 foreach (var s in Values(args, "--src")) job.Sources.Add(new SourceSelection { Path = s });
                 foreach (var x in Values(args, "--xd"))
                     job.OwnerOf(x)?.ExcludedSubfolders.Add(x);
@@ -39,6 +42,7 @@ namespace DttCli
             }
 
             if (verb == "show") { Print(job); return 0; }
+            if (verb == "preflight") return Preflight(job, store, args);
 
             var cts = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => { e.Cancel = true; Console.WriteLine("\ncancelling..."); cts.Cancel(); };
@@ -94,6 +98,58 @@ namespace DttCli
             }
             Console.WriteLine("unknown command " + verb);
             return 2;
+        }
+
+        //   DttCli preflight --dest D --src S... [--user U] [--fix apps|sessions]... [--ack-all]
+        //                    [--app NAME]... [--close-timeout SECONDS] [--restart-onedrive]
+        // Checks only look. Applications are closed only when --fix is given.
+        static int Preflight(JobDefinition job, JobStore store, string[] args)
+        {
+            var pf = new PreflightEngine(job, store.LogDirectory);
+            if (!string.IsNullOrEmpty(job.DestinationUserName))
+            {
+                Console.Write($"Password for {job.DestinationUserName} (not shown, not stored): ");
+                pf.DestinationPassword = ReadPassword();
+            }
+            pf.Activity += a => Console.Write("\r" + (a.Length > 118 ? a.Substring(0, 118) : a.PadRight(118)));
+            pf.RunAll(CancellationToken.None);
+            foreach (var id in Values(args, "--fix"))
+            {
+                if (pf[id].FixLabel == null) { Console.WriteLine($"\nno fix available for '{id}' right now"); continue; }
+                Console.WriteLine($"\napplying fix: {pf[id].FixLabel}");
+                pf.ApplyFix(id, CancellationToken.None);
+            }
+            if (args.Contains("--ack-all")) foreach (var r in pf.Results) pf.Acknowledge(r.Id);
+
+            Console.WriteLine("\r" + new string(' ', 118));
+            foreach (var r in pf.Results)
+            {
+                Console.WriteLine(r + (r.Blocking ? "  (blocking)" : r.Acknowledged ? "  (acknowledged)" : "") + (r.FixLabel != null ? $"  [fix: {r.FixLabel}]" : ""));
+                foreach (var d in r.Details) Console.WriteLine("        " + d);
+            }
+            Console.WriteLine();
+            Console.WriteLine(pf.CanRun ? "RUN ENABLED: every check passed or was acknowledged."
+                                        : "RUN DISABLED: " + string.Join(", ", pf.Results.Where(r => !r.AllowsRun).Select(r => r.Id + (r.Blocking ? " (blocking)" : " (needs acknowledgement)"))));
+            if (pf.OneDriveWasStopped && args.Contains("--restart-onedrive"))
+            {
+                foreach (var n in pf.RestartOneDrive()) Console.WriteLine(n);
+                Console.WriteLine("OneDrive restart requested.");
+            }
+            return pf.CanRun ? 0 : 1;
+        }
+
+        static string ReadPassword()
+        {
+            var sb = new System.Text.StringBuilder();
+            while (true)
+            {
+                var k = Console.ReadKey(true);
+                if (k.Key == ConsoleKey.Enter) break;
+                if (k.Key == ConsoleKey.Backspace) { if (sb.Length > 0) sb.Length--; }
+                else if (k.KeyChar != '\0') sb.Append(k.KeyChar);
+            }
+            Console.WriteLine();
+            return sb.ToString();
         }
 
         static void Print(JobDefinition job)
