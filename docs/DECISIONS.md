@@ -8,6 +8,28 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — V2-M1 design choices (for owner review)
+
+- **Tests do not create Windows accounts.** The v2 spec said the unit tests would create
+  local accounts. Creating accounts on this PC needs the owner's permission, so the access
+  rules are tested against simulated accounts instead (direct admin, domain group, domain not
+  reachable, Microsoft Entra offline, Everyone in Administrators, unreadable Administrators
+  group, deleted account), and the real Windows calls are checked read-only against the
+  current user (`whoami /groups`). Real second users, a domain user and an Entra user are
+  left for the manual test T20.
+- **Account names only**, not full display names: the full name needs another lookup per
+  user (and the domain for domain users). Can be added if wanted.
+- **"All users" first** keeps v1 behaviour. Picking a user also makes *Tick user data* tick
+  only that user's folders; this goes slightly beyond the spec, which only said the picker
+  drives the scores.
+- **"Signed in now"** means a Windows session exists (console, fast user switching or Remote
+  Desktop); a session left disconnected says so. A profile loaded by a service is not counted.
+- **Access unknown is never guessed.** A local account can only be an admin through this
+  PC's own groups, so it always gets an answer; a domain or Entra account whose groups cannot
+  be read while such a group is in Administrators shows "Access unknown" with the reason.
+- The job file stores only the picked user's SID.
+- The window title shows `v2.0.0` (major.minor.patch); the `-alpha` suffix is in the file
+  version details only.
 ## 2026-11-15 — Owner approved M6; current tool becomes v1, new design starts as v2
 
 - The owner asked to keep the current tool as **v1** and to start the new

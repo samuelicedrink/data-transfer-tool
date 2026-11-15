@@ -12,8 +12,8 @@ its score.
 
 - Lists every profile that has signed in on this PC (the profile list the tool already reads,
   `HKLM\...\ProfileList`), excluding system profiles.
-- For each user: display name and account (`PC\anna`, `CORP\anna`), **access level**, last
-  sign-in date, and "signed in now" when a session is open.
+- For each user: account (`PC\anna`, `CORP\anna`), **access level**, last sign-in date, and
+  "signed in now" when a Windows session is open. An "All users" entry comes first.
 - Access level:
   - **Local admin**: the account, or a group it belongs to, is in the local Administrators
     group (SID `S-1-5-32-544`). Nested groups are followed; the group is named, e.g.
@@ -83,8 +83,8 @@ Same rules as v1: one branch per milestone, stop after each for the owner's go-a
 merge to `main` and tag (`v2-m1`, …).
 
 1. **V2-M1 User picker.** Profile list with access level, last sign-in and signed-in-now in
-   the core library, with unit tests (local accounts created by the test, nested group,
-   unreachable domain simulated). Picker on the Select step. v2 keeps its job and credential
+   the core library, with unit tests (simulated accounts for each case, plus read-only checks
+   of the current user on the development PC; see DECISIONS.md). Picker on the Select step. v2 keeps its job and credential
    files apart from v1's so the two versions never resume each other's job.
 2. **V2-M2 Tree-grid with Modified and Size.** Owner-drawn tree-grid, files under opened
    folders, background scan. UI smoke scenario updated.
