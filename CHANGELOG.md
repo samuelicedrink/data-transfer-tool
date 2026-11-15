@@ -26,6 +26,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - Own network connection to a UNC destination with user name and password (password in memory only).
 - `DttCli preflight` console command; stand-in application `tests/DttDummyApp` so tests never close a real program.
 
+- M4 WinForms tool `src/DataTransferTool`: a single exe (library source compiled in, no extra DLL, only .NET Framework references), manifest with requireAdministrator and longPathAware. Screens: Select (lazy folder tree with tri-state check boxes, User data preset, tick by path, Options), Destination (local/USB folder or network share with user name and password, Test destination, layout preview), Pre-flight (all checks with pass/warn/fail, details, fix and acknowledge; Start copy enabled only when everything passed or was acknowledged), Run (progress, files, data, current folder, speed, time left, two-click Cancel, no dialogs).
+- Options dialog: editable file exclusions, profile-folder exclusions, any-depth folder exclusions, known applications, close timeout, threads, retries, wait, backup mode, cloud-only exclusion.
+- Folder selection model `FolderTree` and `UserDataPreset` in the library, with unit tests.
+- Automated UI test `tests/DttUiSmoke`: drives the real window through UI Automation (SmokeTest build with an asInvoker manifest), takes screenshots, verifies the copy; it never presses a fix button, never brings the window to the front and never types into the desktop.
+
 ### Changed
 
 - Flag set after M1 testing (approved by the owner 2026-11-14): add `/BYTES` (exact byte counts; default output prints rounded sizes such as `1.7 m`), add `/FP` (same file-line shape with and without `/MT`) and add `/XA:O` (excludes cloud-only OneDrive files, verified on Windows 11 build 26200). No spec flag removed.
@@ -55,3 +60,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - OneDrive's own `/shutdown` helper never exits when started without the shell; it is now started through the shell and any leftover OneDrive process is ended. Restarting OneDrive through the shell also stops it inheriting the tool's handles.
 - Closing applications verified with the stand-in app: one closed on request, one that refused was force-closed after the timeout.
 - Not testable here: UNC destination with real credentials, a second signed-in user, EFS files (Windows Home), battery power, FAT32 destination. These go to the M6 manual tests.
+
+### Test findings (M4, 2026-11-14, not elevated)
+
+- The Release exe is refused by Windows without elevation (error 740), confirming requireAdministrator.
+- UI test passes all 97 checks: preset, tick and untick, options, destination test, pre-flight acknowledge flow, full copy verified by hash (unticked subfolder and default exclusions absent), two-click Cancel, and closing the window during a copy (cancels and exits in under a second, no dialog, job saved as Cancelled).
+- Found and fixed: setting a split panel's divider while the panel is still small throws, and WinForms swallows exceptions from a Load event on 64-bit Windows, so the Pre-flight screen silently failed to open. The divider is now set once the panel has its real size.
+- The tool window answers in under 1 ms during a 40,000-file copy.
+- The "User data" preset also ticks `OneDrive*\Desktop`, `Documents` and `Pictures` inside a profile, where OneDrive folder backup moves them.

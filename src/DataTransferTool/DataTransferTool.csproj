@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The shipped tool: one exe. The library's source files are compiled straight into it, so there
+    is no DataTransfer.Core.dll to deploy. Configuration "SmokeTest" builds the same exe with an
+    asInvoker manifest (bin\SmokeTest) so the UI can be driven by the automated smoke test without
+    a UAC prompt; the Release build always requires administrator.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>DataTransferTool</AssemblyName>
+    <RootNamespace>DataTransferTool</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Configurations>Debug;Release;SmokeTest</Configurations>
+    <Version>0.4.0</Version>
+    <AssemblyTitle>Data Transfer Tool</AssemblyTitle>
+    <Product>Data Transfer Tool</Product>
+    <Description>Portable data export for Windows 10 and 11 using Robocopy</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'SmokeTest'">
+    <ApplicationManifest>app.asinvoker.manifest</ApplicationManifest>
+    <Optimize>true</Optimize>
+    <DefineConstants>$(DefineConstants);SMOKETEST</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\DataTransfer.Core\**\*.cs" Exclude="..\DataTransfer.Core\obj\**;..\DataTransfer.Core\bin\**" Link="Core\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+</Project>
