@@ -18,7 +18,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <Configurations>Debug;Release;SmokeTest</Configurations>
-    <Version>1.0.0</Version>
+    <Version>2.0.0-alpha</Version>
     <AssemblyTitle>Data Transfer Tool</AssemblyTitle>
     <Product>Data Transfer Tool</Product>
     <Description>Portable data export for Windows 10 and 11 using Robocopy</Description>

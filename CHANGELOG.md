@@ -9,6 +9,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+### Added
+
+- v2 started: `docs/SPEC_V2.md` describes the Select-screen redesign (user picker with access level; Modified, Size, Relevant and Advice columns) and its milestones V2-M1 to V2-M4. Exe version 2.0.0-alpha.
+
 ### Fixed
 
 - `scripts\Build-Release.ps1` stopped at `git worktree add` under Windows PowerShell 5.1, which treats git's progress messages as errors; it now checks git's exit code instead.
