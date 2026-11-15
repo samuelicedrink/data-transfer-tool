@@ -16,6 +16,8 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - M1 investigation harness (`src/DttM1Harness`, console, .NET Framework 4.8) and captured Robocopy logs (`tests/fixtures/m1`) for the M2 parser.
 - M1 findings report (`docs/M1_FINDINGS.md`).
 
+- M2 core library `src/DataTransfer.Core` (no UI): job model, Robocopy command builder, log parser, live log reader, copy engine with cancel, pause on destination loss, stop on destination full, locked-file retry, sleep blocking, and job save/load.
+
 ### Changed
 
 - Flag set after M1 testing (approved by the owner 2026-11-14): add `/BYTES` (exact byte counts; default output prints rounded sizes such as `1.7 m`), add `/FP` (same file-line shape with and without `/MT`) and add `/XA:O` (excludes cloud-only OneDrive files, verified on Windows 11 build 26200). No spec flag removed.
