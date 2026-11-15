@@ -38,3 +38,6 @@ $RECYCLE.BIN/
 # Logs, secrets
 *.log
 .env
+
+# Captured Robocopy logs used as test fixtures are kept
+!tests/fixtures/**/*.log
