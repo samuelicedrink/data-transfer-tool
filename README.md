@@ -2,7 +2,7 @@
 
 A portable data-export tool for Windows 10 and Windows 11: a single `.exe` (C# WinForms, .NET Framework 4.8) that IT staff run from a USB stick to copy a user's selected folders to a local, USB or network destination using Robocopy.
 
-> **Status:** M1 (Robocopy investigation) done, awaiting owner review: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). No application code yet. The specification is in [docs/SPEC.md](docs/SPEC.md).
+> **Status:** M1 (Robocopy investigation) complete: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). M2 (core library) in progress. The specification is in [docs/SPEC.md](docs/SPEC.md).
 
 ## Target platforms
 
