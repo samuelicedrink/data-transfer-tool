@@ -12,6 +12,7 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 ### Added
 
 - v2 started: `docs/SPEC_V2.md` describes the Select-screen redesign (user picker with access level; Modified, Size, Relevant and Advice columns) and its milestones V2-M1 to V2-M4. Exe version 2.0.0-alpha.
+- Core: `UserDirectory` lists the people who have signed in on this PC (profile list; system profiles and profiles whose folder is gone left out) with account name, last sign-in (profile load time, else `NTUSER.DAT` time), signed in now (Remote Desktop session list) and access level: Local admin (direct, or via a named group such as a domain group), Standard user, or Access unknown with the reason (domain not reachable, Microsoft Entra groups offline, Administrators group unreadable). Membership is read with the AuthZ API; nothing is guessed (V2-M1).
 
 ### Changed
 
