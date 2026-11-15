@@ -13,6 +13,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 - v2 started: `docs/SPEC_V2.md` describes the Select-screen redesign (user picker with access level; Modified, Size, Relevant and Advice columns) and its milestones V2-M1 to V2-M4. Exe version 2.0.0-alpha.
 
+### Changed
+
+- v2 keeps its job and credential files under `%ProgramData%\DataTransferTool\v2` when the exe's folder is read-only, so v1 and v2 never resume each other's job (V2-M1).
+
 ### Fixed
 
 - `scripts\Build-Release.ps1` stopped at `git worktree add` under Windows PowerShell 5.1, which treats git's progress messages as errors; it now checks git's exit code instead.

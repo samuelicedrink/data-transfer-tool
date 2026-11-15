@@ -19,11 +19,15 @@ namespace DataTransfer.Core
 
         public JobStore(string directory) { Directory = directory; }
 
-        /// <summary>First writable of: preferred folder (the exe's), %ProgramData%\DataTransferTool.</summary>
+        /// <summary>%ProgramData% folder used when the exe's folder is read-only. v2 has its own so v1 and v2 never resume each other's job.</summary>
+        public static string DefaultFallbackDirectory =>
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DataTransferTool", "v2");
+
+        /// <summary>First writable of: preferred folder (the exe's), <see cref="DefaultFallbackDirectory"/>.</summary>
         public static JobStore Resolve(string preferredDirectory, string fallbackDirectory = null)
         {
             fallbackDirectory = fallbackDirectory ??
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "DataTransferTool");
+                DefaultFallbackDirectory;
             // an existing job file wins, wherever it is
             foreach (var d in new[] { preferredDirectory, fallbackDirectory })
                 if (File.Exists(Path.Combine(d, FileName)) && IsWritable(d)) return new JobStore(d);
