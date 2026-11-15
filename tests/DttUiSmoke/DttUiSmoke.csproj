@@ -18,6 +18,7 @@
     <Reference Include="WindowsBase" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Security" />
   </ItemGroup>
 
 </Project>

@@ -31,6 +31,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - Folder selection model `FolderTree` and `UserDataPreset` in the library, with unit tests.
 - Automated UI test `tests/DttUiSmoke`: drives the real window through UI Automation (SmokeTest build with an asInvoker manifest), takes screenshots, verifies the copy; it never presses a fix button, never brings the window to the front and never types into the desktop.
 
+- M5 Report screen: outcome, copied / skipped / failed per folder job and in total, the list of files and folders not copied with a plain reason and the Windows message, Open CSV, Save CSV as, Open log folder, Retry failed, and Continue copy after a cancel or a full destination.
+- Failures CSV (`failures_<COMPUTERNAME>_<job>.csv` in the log folder): source and destination path, type, reason, error code, Windows message, size, attempts, time. UTF-8 with BOM for Excel; cells that start like a formula are neutralised.
+- Resume on launch: an unfinished job beside the exe is described and offered for resume; resuming restores the selection and destination and runs the pre-flight checks again. *Start a new job* moves the old job file to the log folder. A finished job is moved to the log folder on close.
+- *Save credentials for resume* on the Destination screen (network share with a user name only): encrypted with DPAPI, CurrentUser scope, bound to the job, in `DataTransferJob.credentials` beside the job. Deleted when the job finishes, when a new job is started, and on close when the box is not ticked. Without saved credentials a resumed network job asks for the password.
+
 ### Changed
 
 - Flag set after M1 testing (approved by the owner 2026-11-14): add `/BYTES` (exact byte counts; default output prints rounded sizes such as `1.7 m`), add `/FP` (same file-line shape with and without `/MT`) and add `/XA:O` (excludes cloud-only OneDrive files, verified on Windows 11 build 26200). No spec flag removed.
@@ -68,3 +73,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - Found and fixed: setting a split panel's divider while the panel is still small throws, and WinForms swallows exceptions from a Load event on 64-bit Windows, so the Pre-flight screen silently failed to open. The divider is now set once the panel has its real size.
 - The tool window answers in under 1 ms during a 40,000-file copy.
 - The "User data" preset also ticks `OneDrive*\Desktop`, `Documents` and `Pictures` inside a profile, where OneDrive folder backup moves them.
+
+### Test findings (M5, 2026-11-15, not elevated)
+
+- UI test extended to six scenarios, 182 checks, all passing: report after a clean copy; continue after Cancel (all 40,000 files); resume offered at the next launch after closing the window mid-copy (all 40,000 files); a file held open is reported with reason and error 32, appears in the CSV, and is copied by Retry failed once released (identical by hash); resume of a network job with saved credentials (used without prompting, password not shown in the window) and without them (asks for the password).
+- The test password did not appear in any file the tool wrote (job file, logs, CSV).
+- After an interruption the copied/skipped split is approximate (flagged on screen): a resumed 40,000-file job reported 39,998 copied and 2 skipped. The files at the destination were complete.
+- Not testable here: saving credentials against a real share, and reading them back as a different Windows user or on another PC (DPAPI should refuse; the tool then asks for the password).
