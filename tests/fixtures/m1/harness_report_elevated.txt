@@ -1,0 +1,141 @@
+﻿# M1 harness  elevated=True  os=6.2.9200.0  robocopy=10.0.26100.1
+# base flags: /E /B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP
+
+== Generate main tree
+  INFO 234 files, 20 dirs, longest path 637 chars
+
+== T1 spec flag set verbatim (includes /B)
+  INFO exit=1 0.2s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=n/a
+  PASS elevated: spec flags verbatim copy exits 1 (all copied)
+  PASS spec verbatim copy: 228 files + 17 dirs identical (hash, size, times, attrs), 9 excluded items absent, 0 problem(s)
+  INFO summary lines without /BYTES:
+           Files : *.*
+           Dirs :        21        18         3         0         0         0
+          Files :       232       228         4         0         0         0
+          Bytes :   44.44 m   44.44 m       400         0         0         0
+          Times :   0:00:01   0:00:00                       0:00:00   0:00:00
+          Speed :           419,845,864 Bytes/sec.
+          Speed :            24,023.773 MegaBytes/min.
+          Ended : November 14, 2026 6:06:55 PM
+
+== T2 log format variants (/L listings against an empty destination)
+  INFO t2_L_spec: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=n/a  loglines=261 stdoutChars=52
+  INFO t2_L_bytes_fp: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0  loglines=261 stdoutChars=56
+  INFO t2_L_nomt_bytes_fp: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0  loglines=279 stdoutChars=61
+  INFO t2_L_bytes_fp_ndl: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0  loglines=240 stdoutChars=60
+  INFO t2_L_v_ts: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0  loglines=268 stdoutChars=52
+  INFO t2_L_nfl_ndl: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0  loglines=33 stdoutChars=55
+  PASS /L created nothing at the destination
+
+== T3 full copy with the working flag set + default exclusions
+  INFO exit=1 0.1s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0
+  PASS exit code 1 (files copied, no failures)
+  PASS copy /MT:8: 228 files + 17 dirs identical (hash, size, times, attrs), 9 excluded items absent, 0 problem(s)
+  PASS /XJ: junction target not copied through the junction
+  INFO junction entry at destination exists as: nothing
+  PASS /E: empty folder created
+  PASS /UNILOG without /TEE: stdout is quiet (48 chars)
+  INFO no /MT: exit=1 0.2s files(total/copied/skipped/mismatch/failed/extras)=232/228/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46603291/46602891/400/0/0/0
+  PASS copy without /MT: 228 files + 17 dirs identical (hash, size, times, attrs), 9 excluded items absent, 0 problem(s)
+  INFO /DCOPY:DA (no T): folder modified-time kept=True, folder created-time kept=False
+  PASS /DCOPY:DA (without T) loses the folder created-time, so the T in /DCOPY:DAT is doing real work
+
+== T4 skip-if-identical
+  INFO exit=0 0.0s files(total/copied/skipped/mismatch/failed/extras)=232/0/232/0/0/0 dirs=21/18/21/0/0/0 bytes=46603291/0/46603291/0/0/0
+  PASS rerun: exit 0, 0 copied, every file skipped
+  INFO exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=233/3/230/0/0/0 dirs=21/18/21/0/0/0 bytes=46634613/96687/46537926/0/0/0
+  PASS after changing 2 files and adding 1: exactly 3 copied
+  INFO content changed but size+mtime kept: copied=0 (0 means robocopy treats it as identical, as the spec asks)
+
+== T5 /FFT (2-second timestamp tolerance)
+  PASS destination time off by 1 s: with /FFT would copy 0, without /FFT would copy 1
+  PASS destination time off by 3 s: with /FFT would copy 1
+
+== T6 long paths (source > 400 chars, destination base > 260 chars)
+  INFO destination base length 323
+  INFO exit=1 0.1s files(total/copied/skipped/mismatch/failed/extras)=233/229/4/0/0/0 dirs=21/18/3/0/0/0 bytes=46634613/46634213/400/0/0/0
+  PASS exit code 1
+  PASS long destination: 229 files + 17 dirs identical (hash, size, times, attrs), 9 excluded items absent, 0 problem(s)
+  INFO longest destination path written: 943 chars
+  INFO plain (no \\?\) .NET file IO on a >260 path works on this PC (LongPathsEnabled=1 here; not guaranteed on other PCs)
+
+== T7 per-file errors: locked file, access-denied file, unreadable folder
+  INFO /L scan : exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=5/5/0/0/0/0 dirs=3/3/0/0/0/0 bytes=15000/15000/0/0/0/0
+  INFO copy    : exit=9 2.1s files(total/copied/skipped/mismatch/failed/extras)=5/4/0/0/1/0 dirs=3/3/0/0/0/0 bytes=15000/13000/0/0/2000/0
+  INFO error lines in the copy log:
+       	    New File  		    3000	D:\DttM1\src_err\denied.txt
+       2026/11/14 18:07:02 ERROR 32 (0x00000020) Copying File D:\DttM1\src_err\locked.docx
+       The process cannot access the file because it is being used by another process.
+       2026/11/14 18:07:04 ERROR 32 (0x00000020) Copying File D:\DttM1\src_err\locked.docx
+       The process cannot access the file because it is being used by another process.
+       ERROR: RETRY LIMIT EXCEEDED.
+  PASS exit code has the 'some files failed' bit (8) and is not fatal: 9
+  PASS healthy files were still copied; no prompt, no hang
+  INFO locked.docx copied=False, denied.txt copied=True, DeniedDir\inside.txt copied=True  (elevated /B is expected to copy the two ACL-denied ones)
+  INFO elapsed 2.1s with /R:1 /W:2
+  INFO retry after unlock: exit=1 0.0s files(total/copied/skipped/mismatch/failed/extras)=5/1/4/0/0/0 dirs=3/3/3/0/0/0 bytes=15000/2000/13000/0/0/0
+  PASS second pass picks up exactly the previously failed files; tree now identical
+
+== T8 resume after a killed run
+  INFO source: 300 files, 2290 MB
+  PASS robocopy killed mid-run (exit -1) with ~121 of 300 files at the destination
+  INFO killed-run log lists 8 file line(s) while 121 files were already at the destination: with /MT the log falls behind while a large file is in flight, and the unflushed tail is lost on a kill
+  INFO killed-run log has a summary block: False
+  INFO after kill: 114 complete, 178 not started, 0 wrong size, 8 full-size-but-incomplete
+       dir0\f_007.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:19Z), attrs Archive
+       dir0\f_037.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:20Z), attrs Archive
+       dir1\f_067.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:22Z), attrs Archive
+       dir1\f_097.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:23Z), attrs Archive
+       dir2\f_118.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:23Z), attrs Archive
+       dir2\f_119.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:23Z), attrs Archive
+       dir2\f_120.bin: FULL SIZE but content incomplete, mtime 1980-01-02 00:00:00Z (source 2026-11-15 00:35:23Z), attrs Archive
+       dir2\f_121.bin: FULL SIZE but content incomplete, mtime 2026-11-15 01:07:05Z (source 2026-11-15 00:35:23Z), attrs Archive
+  PASS no partial file has BOTH the final size and the final timestamp (so a rerun cannot mistake a partial file for a finished one)
+  INFO resume run: exit=1 0.6s files(total/copied/skipped/mismatch/failed/extras)=300/186/114/0/0/0 dirs=7/7/7/0/0/0 bytes=2401239040/2281701376/119537664/0/0/0
+  PASS resume skipped the 114 files that were already complete
+  PASS after resume: 300 files + 6 dirs identical (hash, size, times, attrs), 0 excluded items absent, 0 problem(s)
+  PASS third run has nothing left to do (exit 0)
+
+== T9 live progress: when does per-file output reach a watcher?
+  INFO t9_live_unilog_mt: 7.9s exit=1 finalLog=722266 finalStdoutFileLines=0
+       t= 0.01s  filesAtDest=    0  logBytes=       -1  stdoutFileLines=    0
+       t= 0.98s  filesAtDest= 1375  logBytes=   164656  stdoutFileLines=    0
+       t= 1.91s  filesAtDest= 1645  logBytes=   197296  stdoutFileLines=    0
+       t= 2.80s  filesAtDest= 3642  logBytes=   432016  stdoutFileLines=    0
+       t= 4.47s  filesAtDest= 4949  logBytes=   587656  stdoutFileLines=    0
+       t= 6.23s  filesAtDest= 5821  logBytes=   697696  stdoutFileLines=    0
+       t= 7.73s  filesAtDest= 5984  logBytes=   718096  stdoutFileLines=    0
+  INFO t9_live_unilog_tee_mt: 19.1s exit=1 finalLog=722280 finalStdoutFileLines=6000
+       t= 0.01s  filesAtDest=    0  logBytes=       -1  stdoutFileLines=    0
+       t= 3.07s  filesAtDest=    0  logBytes=        0  stdoutFileLines=    0
+       t= 6.16s  filesAtDest=    0  logBytes=        0  stdoutFileLines=    0
+       t= 9.26s  filesAtDest=    0  logBytes=        0  stdoutFileLines=    0
+       t=12.37s  filesAtDest=    0  logBytes=        0  stdoutFileLines=    0
+       t=15.46s  filesAtDest=    0  logBytes=        0  stdoutFileLines=    0
+       t=18.83s  filesAtDest= 5258  logBytes=   627986  stdoutFileLines= 5256
+  INFO t9_live_stdout_mt: 1.4s exit=1 finalLog=-1 finalStdoutFileLines=6000
+       t= 0.00s  filesAtDest=    0  logBytes=       -1  stdoutFileLines=    0
+       t= 0.19s  filesAtDest=  545  logBytes=       -1  stdoutFileLines=  549
+       t= 0.38s  filesAtDest= 1307  logBytes=       -1  stdoutFileLines= 1314
+       t= 0.56s  filesAtDest= 2184  logBytes=       -1  stdoutFileLines= 2176
+       t= 0.75s  filesAtDest= 3177  logBytes=       -1  stdoutFileLines= 3166
+       t= 0.94s  filesAtDest= 4180  logBytes=       -1  stdoutFileLines= 4174
+       t= 1.13s  filesAtDest= 5041  logBytes=       -1  stdoutFileLines= 4962
+       t= 1.32s  filesAtDest= 5697  logBytes=       -1  stdoutFileLines= 5693
+  INFO t9_live_unilog_nomt: 3.8s exit=1 finalLog=723454 finalStdoutFileLines=0
+       t= 0.01s  filesAtDest=    0  logBytes=       -1  stdoutFileLines=    0
+       t= 0.51s  filesAtDest=  811  logBytes=    98440  stdoutFileLines=    0
+       t= 1.03s  filesAtDest= 1693  logBytes=   204224  stdoutFileLines=    0
+       t= 1.61s  filesAtDest= 2636  logBytes=   317328  stdoutFileLines=    0
+       t= 2.23s  filesAtDest= 3618  logBytes=   435112  stdoutFileLines=    0
+       t= 2.85s  filesAtDest= 4568  logBytes=   550256  stdoutFileLines=    0
+       t= 3.47s  filesAtDest= 5482  logBytes=   659668  stdoutFileLines=    0
+  INFO t9_live_stdout_nomt: 10.4s exit=1 finalLog=-1 finalStdoutFileLines=6000
+       t= 0.01s  filesAtDest=    0  logBytes=       -1  stdoutFileLines=    0
+       t= 1.69s  filesAtDest= 1732  logBytes=       -1  stdoutFileLines= 1731
+       t= 3.37s  filesAtDest= 3199  logBytes=       -1  stdoutFileLines= 3198
+       t= 5.18s  filesAtDest= 4953  logBytes=       -1  stdoutFileLines= 4952
+       t= 6.85s  filesAtDest= 4953  logBytes=       -1  stdoutFileLines= 4952
+       t= 8.53s  filesAtDest= 4953  logBytes=       -1  stdoutFileLines= 4952
+       t=10.29s  filesAtDest= 5900  logBytes=       -1  stdoutFileLines= 5900
+# done, 0 FAIL line(s)
