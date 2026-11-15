@@ -14,7 +14,10 @@ namespace DataTransfer.Core
     {
         /// <summary>FilesCopied/BytesCopied here mean "would be copied".</summary>
         public Counts Totals = new Counts();
+        /// <summary>Errors Robocopy named during the scan (it does not name unreadable folders).</summary>
         public List<FileFailure> Unreadable = new List<FileFailure>();
+        /// <summary>Folders the scan could not read. Robocopy /L only counts them.</summary>
+        public long UnreadableFolders;
         public bool Cancelled;
         public string FatalError;
     }
@@ -55,6 +58,8 @@ namespace DataTransfer.Core
         public long? ExpectedFiles, ExpectedBytes;
         /// <summary>Loop interval while Robocopy runs.</summary>
         public int TickMilliseconds = 200;
+        /// <summary>Minimum time between two Progress events.</summary>
+        public int ReportIntervalMilliseconds = 400;
 
         public CopyEngine(JobDefinition job, string logDirectory)
         {
@@ -142,6 +147,7 @@ namespace DataTransfer.Core
                 if (a.End == AttemptEnd.Fatal) { result.FatalError = a.Detail; return result; }
                 result.Totals.Add(a.Parser.ToCounts());
                 result.Unreadable.AddRange(a.Parser.Failures);
+                if (a.Parser.Dirs != null) result.UnreadableFolders += a.Parser.Dirs[4];
             }
             return result;
         }
@@ -417,9 +423,9 @@ namespace DataTransfer.Core
         void Report(EnginePhase phase, RobocopyLogParser parser, bool force = false)
         {
             var now = clock.Elapsed;
-            if (!force && (now - lastReport).TotalMilliseconds < 400) return;
+            if (!force && (now - lastReport).TotalMilliseconds < ReportIntervalMilliseconds) return;
             lastReport = now;
-            if ((now - lastFreeCheck).TotalSeconds >= 1 && phase != EnginePhase.Scanning && phase != EnginePhase.PausedDestinationUnavailable)
+            if ((force || (now - lastFreeCheck).TotalSeconds >= 1) && phase != EnginePhase.Scanning && phase != EnginePhase.PausedDestinationUnavailable)
             {
                 lastFreeCheck = now;
                 long? free = FreeSpace();
