@@ -8,6 +8,20 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — M6: what remains before release (for owner review)
+
+- The manual tests in `MANUAL_TESTS.md` have not been run. Until they pass, the
+  tool should be used only on test PCs.
+- Proposal: when the manual tests pass, release the tool as `v1.0.0`: move
+  `[Unreleased]` in the change log to a dated `1.0.0` section, set the exe
+  version to 1.0.0 and tag `v1.0.0`. Any failing test is fixed first on its own
+  branch.
+- The exe is not code-signed. Signing it would avoid SmartScreen warnings when
+  the exe is downloaded rather than copied from a stick; it needs a code-signing
+  certificate, which is the owner's decision.
+- Test results go into `docs/test-results/` without real user, computer or
+  share names.
+
 ## 2026-11-15 — Owner approved M5
 
 The owner gave the go-ahead to merge M5 and start M6, keeping the M5 choices
