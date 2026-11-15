@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\DataTransfer.Core\DataTransfer.Core.csproj" />
+    <ProjectReference Include="..\DttDummyApp\DttDummyApp.csproj" ReferenceOutputAssembly="false" />
     <None Include="..\fixtures\**\*.log" LinkBase="fixtures" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

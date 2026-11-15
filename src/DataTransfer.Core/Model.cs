@@ -43,6 +43,23 @@ namespace DataTransfer.Core
         }
     }
 
+    /// <summary>Editable pre-flight settings.</summary>
+    [DataContract]
+    public sealed class PreflightOptions
+    {
+        /// <summary>Process names (without .exe) that should be closed before a run.</summary>
+        [DataMember] public List<string> KnownApps { get; set; } = new List<string>(AppCloser.DefaultKnownApps);
+        /// <summary>How long applications get to close by themselves before they are force-closed.</summary>
+        [DataMember] public int AppCloseTimeoutSeconds { get; set; } = 20;
+
+        [OnDeserialized]
+        void Fix(StreamingContext c)
+        {
+            KnownApps = KnownApps ?? new List<string>(AppCloser.DefaultKnownApps);
+            if (AppCloseTimeoutSeconds < 1) AppCloseTimeoutSeconds = 20;
+        }
+    }
+
     [DataContract]
     public sealed class Counts
     {
@@ -115,6 +132,7 @@ namespace DataTransfer.Core
         /// <summary>User name for a UNC destination. The password is not part of the job.</summary>
         [DataMember] public string DestinationUserName { get; set; }
         [DataMember] public CopyOptions Options { get; set; } = new CopyOptions();
+        [DataMember] public PreflightOptions Preflight { get; set; } = new PreflightOptions();
         [DataMember] public List<SourceSelection> Sources { get; set; } = new List<SourceSelection>();
         [DataMember] public JobState State { get; set; }
         [DataMember] public DateTime? StartedUtc { get; set; }
@@ -125,6 +143,7 @@ namespace DataTransfer.Core
         void Fix(StreamingContext c)
         {
             Options = Options ?? new CopyOptions();
+            Preflight = Preflight ?? new PreflightOptions();
             Sources = Sources ?? new List<SourceSelection>();
         }
 
