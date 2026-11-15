@@ -36,6 +36,9 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - Resume on launch: an unfinished job beside the exe is described and offered for resume; resuming restores the selection and destination and runs the pre-flight checks again. *Start a new job* moves the old job file to the log folder. A finished job is moved to the log folder on close.
 - *Save credentials for resume* on the Destination screen (network share with a user name only): encrypted with DPAPI, CurrentUser scope, bound to the job, in `DataTransferJob.credentials` beside the job. Deleted when the job finishes, when a new job is started, and on close when the box is not ticked. Without saved credentials a resumed network job asks for the password.
 
+- M6 manual test plan `MANUAL_TESTS.md`: 19 tests for what cannot be automated here (UAC prompt, clean Windows 10 and 11, domain PC, network share with credentials, saved credentials across accounts and PCs, USB pulled mid-run, network drop, real OneDrive profile, full destination, FAT32 and exFAT, second signed-in user, open applications, EFS, battery and sleep blocking, read-only stick, resume after a crash, a 200 GB job, high DPI), each with setup, steps and expected results, and a results table.
+- `tests/manual/New-DttTestData.ps1`: generates safe test data on the PC under test (Office-like files, pictures, large files, a path over 400 characters, accented and Japanese names, files the default exclusions skip, optionally a 4.2 GB file and folders in the test user's profile); `-Remove` deletes it again.
+
 ### Changed
 
 - Flag set after M1 testing (approved by the owner 2026-11-14): add `/BYTES` (exact byte counts; default output prints rounded sizes such as `1.7 m`), add `/FP` (same file-line shape with and without `/MT`) and add `/XA:O` (excludes cloud-only OneDrive files, verified on Windows 11 build 26200). No spec flag removed.
