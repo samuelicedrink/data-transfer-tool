@@ -24,7 +24,8 @@ namespace DataTransferTool
         public MainForm(JobStore store)
         {
             state = new AppState { Store = store };
-            Text = $"Data Transfer Tool - {Environment.MachineName}";
+            var v = typeof(MainForm).Assembly.GetName().Version;
+            Text = $"Data Transfer Tool v{v.Major}.{v.Minor}.{v.Build} - {Environment.MachineName}";
             Name = "MainForm";
             Font = Ui.BaseFont;
             AutoScaleMode = AutoScaleMode.Dpi;

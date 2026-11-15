@@ -2,7 +2,7 @@
 
 A portable data-export tool for Windows 10 and Windows 11: a single `.exe` (C# WinForms, .NET Framework 4.8) that IT staff run from a USB stick to copy a user's selected folders to a local, USB or network destination using Robocopy.
 
-> **Status:** M1 to M4 complete (Robocopy investigation, core library, pre-flight engine, WinForms UI). M5 (report screen, retry failed, resume on launch, saved credentials) complete. M6: manual test plan written ([MANUAL_TESTS.md](MANUAL_TESTS.md)), awaiting owner review; the manual tests themselves have not been run yet. Findings: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). Specification: [docs/SPEC.md](docs/SPEC.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
+> **Status:** v1.0.0 released (milestones M1 to M6). **The manual tests in [MANUAL_TESTS.md](MANUAL_TESTS.md) have not been run yet; use v1 only on test PCs until they pass.** v2 (user picker and relevance columns on the Select screen) is in development. Findings: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). Specification: [docs/SPEC.md](docs/SPEC.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Target platforms
 
@@ -41,6 +41,22 @@ docs/                   specification, findings, decisions
 ## Versioning and change log
 
 This project follows [Semantic Versioning](https://semver.org/). Every user-visible change is recorded in [CHANGELOG.md](CHANGELOG.md) under `Unreleased`, and moved to a dated version section at release time. Releases are tagged `vMAJOR.MINOR.PATCH`.
+
+## Release folder (v1 and v2 side by side)
+
+`scripts\Build-Release.ps1` builds a tag or branch in a temporary git worktree (your working copy is not touched) and puts the exe into `release\<name>\` with a `BUILD.txt` naming the commit. The `release` folder is not committed.
+
+```
+powershell -ExecutionPolicy Bypass -File scripts\Build-Release.ps1 -Ref v1.0.0 -Name v1
+powershell -ExecutionPolicy Bypass -File scripts\Build-Release.ps1 -Ref HEAD -Name v2
+```
+
+| Folder | Built from | What it is |
+|---|---|---|
+| `release\v1\` | tag `v1.0.0` (fixes: branch `v1`) | The current tool: five steps, profile folder tree |
+| `release\v2\` | the current v2 branch | In development: user picker, Modified / Size / Relevance columns |
+
+Copy the whole folder (exe and `.config`) to the USB stick. The window title shows which version is running.
 
 ## Build and test
 
