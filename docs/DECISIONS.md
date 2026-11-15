@@ -1,4 +1,4 @@
-﻿# Decisions and deviations
+# Decisions and deviations
 
 Newest first. One entry per decision: date, what was decided, why, who decided.
 
@@ -15,7 +15,7 @@ M1 was run in a local, non-elevated session on Windows 11. Results are in
 
 Open: `/B` has not been tested elevated. Pushes to GitHub failed from this PC
 (no stored sign-in); commits are local until the owner signs in.
-## 2026-11-15 â€” Windows testing runs on the owner's Windows PC
+## 2026-11-15 — Windows testing runs on the owner's Windows PC
 
 M1 requires testing Robocopy "on this machine". The session that set up this
 repository ran in a Linux cloud container with no Windows, Robocopy or .NET
