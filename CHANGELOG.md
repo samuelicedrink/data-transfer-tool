@@ -12,3 +12,4 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 ### Added
 
 - Initial repository structure: README, change log, `.gitignore`, `.gitattributes`.
+- Build specification (`docs/SPEC.md`), decision log (`docs/DECISIONS.md`) and working instructions for Claude Code sessions (`CLAUDE.md`), including the rule that every change is committed, pushed to GitHub and recorded here.

@@ -1,8 +1,8 @@
 # Data Transfer Tool
 
-A desktop application for Windows 10 and Windows 11, distributed as a standalone `.exe`.
+A portable data-export tool for Windows 10 and Windows 11: a single `.exe` (C# WinForms, .NET Framework 4.8) that IT staff run from a USB stick to copy a user's selected folders to a local, USB or network destination using Robocopy.
 
-> **Status:** pre-development. No application code yet — the tech stack and feature scope are still to be decided.
+> **Status:** pre-development. No application code yet. The specification is in [docs/SPEC.md](docs/SPEC.md); milestone M1 (Robocopy investigation) has not started.
 
 ## Target platforms
 
