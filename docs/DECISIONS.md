@@ -8,7 +8,13 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
-## 2026-11-15 — M5 design choices (for owner review)
+## 2026-11-15 — Owner approved M5
+
+The owner gave the go-ahead to merge M5 and start M6, keeping the M5 choices
+below (including running the pre-flight checks again on resume). M5 merged to
+`main` and tagged `m5`.
+
+## 2026-11-15 — M5 design choices
 
 - **Report** is a fifth screen after Run. It shows a Continue copy button when
   the job did not finish (cancelled, destination full), and Retry failed when
