@@ -21,7 +21,9 @@ its score.
   - **Standard user** otherwise.
   - **Unknown (domain not reachable)** when group membership of a domain account cannot be
     resolved. Never guessed.
-- Changing the user recalculates only the Relevant and Advice columns. Ticks are kept.
+- Changing the user recalculates only the Relevant and Advice columns. Picking a user never
+  ticks or unticks anything, and *Tick user data* keeps covering every profile.
+- A SID is never shown; account names are shown as Windows names them.
 
 ## 2. Folder and file tree with columns
 

@@ -154,7 +154,7 @@ namespace DataTransfer.Core
             if (ok && groups != null)
             {
                 var via = groupMembers.FirstOrDefault(m => groups.Contains(m.Sid));
-                if (via != null) { u.Access = AccessLevel.LocalAdmin; u.AccessVia = via.Name ?? via.Sid; return; }
+                if (via != null) { u.Access = AccessLevel.LocalAdmin; u.AccessVia = via.Name ?? UnnamedGroup(via.Sid); return; }
                 if (groups.Contains(AdministratorsSid)) { u.Access = AccessLevel.LocalAdmin; return; }
                 u.Access = AccessLevel.StandardUser; return;
             }
@@ -170,6 +170,10 @@ namespace DataTransfer.Core
             u.Access = AccessLevel.Unknown;
             u.AccessNote = u.Sid.StartsWith("S-1-12-1-", StringComparison.OrdinalIgnoreCase) ? "Microsoft Entra groups cannot be checked offline" : "domain not reachable";
         }
+
+        /// <summary>Text for a group whose name cannot be looked up; a SID is never shown.</summary>
+        public static string UnnamedGroup(string sid) =>
+            sid != null && sid.StartsWith("S-1-12-1-", StringComparison.OrdinalIgnoreCase) ? "a Microsoft Entra group" : "a group whose name cannot be looked up";
 
         static bool Same(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         static T Safe<T>(Func<T> f) where T : class { try { return f(); } catch { return null; } }

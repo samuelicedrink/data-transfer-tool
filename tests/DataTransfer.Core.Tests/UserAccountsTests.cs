@@ -109,7 +109,7 @@ namespace DataTransfer.Core.Tests
             Assert.That(eve.Access, Is.EqualTo(AccessLevel.Unknown));
             Assert.That(eve.AccessNote, Does.Contain("Microsoft Entra"));
             f.Groups[Eve] = new HashSet<string> { EntraAdmins };
-            Assert.That(Get(UserDirectory.List(f), Eve).AccessText, Is.EqualTo("Local admin (via " + EntraAdmins + ")"), "SID shown when the group has no name");
+            Assert.That(Get(UserDirectory.List(f), Eve).AccessText, Is.EqualTo("Local admin (via a Microsoft Entra group)"), "a SID is never shown");
         }
 
         [Test]
@@ -155,6 +155,7 @@ namespace DataTransfer.Core.Tests
             var old = Get(list, Old);
             Assert.That(old.Account, Is.EqualTo("olduser"));
             Assert.That(old.AccountFound, Is.False);
+            Assert.That(list.All(u => !u.ToString().Contains("S-1-")), "no SID in any entry");
         }
 
         // ---------------------------------------------------------------- real system, read-only

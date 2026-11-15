@@ -8,7 +8,7 @@
 //             destination test, acknowledge warnings, copy both sources, verify the copy.
 // Scenario B: start a copy and cancel it with the two-click Cancel button.
 // Scenario C: start a copy and close the window: it must cancel and exit without any dialog.
-// Scenario G (v2): user picker lists this PC's users with access level; Tick user data follows it.
+// Scenario G (v2): user picker lists this PC's users with access level; picking one ticks nothing.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -363,13 +363,13 @@ static class Program
         for (int i = 0; i < idx; i++) { PostMessage(h, 0x0100, new IntPtr(0x28), new IntPtr(0x01500001)); PostMessage(h, 0x0101, new IntPtr(0x28), new IntPtr(unchecked((int)0xC1500001))); }
         Check(WaitFor(() => Text("accessLabel").StartsWith(expected) && Text("accessLabel").Contains("signed in now"), 10), "picking the user shows access and \"signed in now\": " + Text("accessLabel"));
 
+        Thread.Sleep(500);
+        Check(Items("selectionList").Count == 0, "picking a user ticks nothing");
+        Check(!names.Any(n => n.Contains("S-1-")) && !Text("accessLabel").Contains("S-1-"), "no SID shown");
         Invoke(Id("userDataButton"));
         Thread.Sleep(800);
-        string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\') + "\\";
-        var jobs = Items("selectionList");
         string msg = Text("messageLabel");
-        Check(msg == "No user folders found." || (msg.StartsWith("Ticked ") && msg.EndsWith(" of " + me + ".")), "preset names the picked user: " + msg);
-        Check(jobs.All(j => j.StartsWith(profile, StringComparison.OrdinalIgnoreCase)), $"only this user's folders are ticked ({jobs.Count} job(s))");
+        Check(msg == "No user folders found." || (msg.StartsWith("Ticked ") && msg.EndsWith(" profile(s).")), "Tick user data still covers every profile: " + msg);
         Shot("g-user-picker");
         Invoke(Id("clearButton"));
 

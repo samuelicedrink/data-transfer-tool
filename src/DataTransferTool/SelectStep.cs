@@ -18,7 +18,6 @@ namespace DataTransferTool
         readonly ComboBox userCombo = new ComboBox { Name = "userCombo", DropDownStyle = ComboBoxStyle.DropDownList, Width = 340, Margin = new Padding(3, 4, 3, 3) };
         readonly Label accessLabel = new Label { Name = "accessLabel", AutoSize = true, Margin = new Padding(3, 7, 3, 3) };
         readonly ToolTip tips = new ToolTip();
-        Button userDataButton;
 
         /// <summary>An entry of the user picker; User is null for "All users".</summary>
         sealed class UserItem
@@ -30,12 +29,13 @@ namespace DataTransferTool
 
         public SelectStep(AppState state) : base(state)
         {
-            var userData = userDataButton = Ui.Button("userDataButton", "Tick user data");
+            var userData = Ui.Button("userDataButton", "Tick user data");
             var clear = Ui.Button("clearButton", "Clear");
             var add = Ui.Button("addPathButton", "Tick");
             var browse = Ui.Button("browseButton", "Browse...");
             var options = Ui.Button("optionsButton", "Options...");
-            SetUserDataTip();
+            tips.SetToolTip(userData, "Ticks Desktop, Documents, Pictures and Downloads of every user profile on this PC.");
+            tips.SetToolTip(userCombo, "Whose data this is. Used to estimate how relevant each folder is to that user; it does not tick anything.");
 
             var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, 6) };
             bar.Controls.AddRange(new Control[] { userData, clear, Ui.Label("Folder:"), addPathBox, add, browse, options, messageLabel });
@@ -197,17 +197,14 @@ namespace DataTransferTool
 
         void TickUserData()
         {
-            var user = (userCombo.SelectedItem as UserItem)?.User;
-            var profiles = user == null ? State.Profiles
-                : new ProfileInfo { ProfilesDirectory = State.Profiles.ProfilesDirectory, ProfileFolders = { user.ProfilePath } };
-            var folders = UserDataPreset.Folders(profiles);
+            var folders = UserDataPreset.Folders(State.Profiles);
             int ticked = folders.Count(State.Tree.Include);
             string usersDir = State.Profiles.ProfilesDirectory.TrimEnd('\\') + "\\";
             int count = folders.Where(f => f.StartsWith(usersDir, StringComparison.OrdinalIgnoreCase))
                                   .Select(f => f.Substring(usersDir.Length).Split('\\')[0])
                                   .Distinct(StringComparer.OrdinalIgnoreCase).Count();
             if (folders.Count > 0) Reveal(State.Profiles.ProfilesDirectory);
-            Refresh(ticked == 0 ? "No user folders found." : user != null ? $"Ticked {ticked} folder(s) of {user.Account}." : $"Ticked {ticked} folder(s) in {count} profile(s).");
+            Refresh(ticked == 0 ? "No user folders found." : $"Ticked {ticked} folder(s) in {count} profile(s).");
         }
 
         void Refresh(string message)
@@ -278,15 +275,6 @@ namespace DataTransferTool
                 accessLabel.ForeColor = u.Access == AccessLevel.Unknown ? Ui.Warning : SystemColors.ControlText;
                 tips.SetToolTip(accessLabel, "Profile folder: " + u.ProfilePath + (u.AccountFound ? "" : "\r\nThe account no longer exists or cannot be looked up."));
             }
-            SetUserDataTip();
-        }
-
-        void SetUserDataTip()
-        {
-            var u = (userCombo.SelectedItem as UserItem)?.User;
-            tips.SetToolTip(userDataButton, u == null
-                ? "Ticks Desktop, Documents, Pictures and Downloads of every user profile on this PC."
-                : $"Ticks Desktop, Documents, Pictures and Downloads of {u.Account}.");
         }
 
         void Message(string text, bool error)
