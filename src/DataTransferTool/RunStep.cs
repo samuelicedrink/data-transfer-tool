@@ -140,7 +140,7 @@ namespace DataTransferTool
             double fraction = p.TotalBytes.HasValue && p.TotalBytes.Value > 0 ? Math.Min(1, (double)p.BytesCopied / p.TotalBytes.Value) : 0;
             bytesLabel.Text = Ui.Size(p.BytesCopied) + (p.TotalBytes.HasValue ? $" of {Ui.Size(p.TotalBytes.Value)}  ({fraction:P0})" : "");
             bar.Value = (int)(fraction * 1000);
-            if (p.CurrentFolder != null) folderLabel.Text = p.CurrentFolder;
+            if (p.CurrentFolder != null) folderLabel.Text = p.CurrentFolder.Length <= 110 ? p.CurrentFolder : "..." + p.CurrentFolder.Substring(p.CurrentFolder.Length - 107);
             speedLabel.Text = p.BytesPerSecond > 0 ? $"{p.BytesPerSecond / 1048576.0:0.0} MB/s" : "-";
             etaLabel.Text = p.Phase != EnginePhase.Copying ? "-" : p.Eta.HasValue ? Ui.Duration(p.Eta.Value) : "calculating...";
             elapsedLabel.Text = Ui.Duration(p.Elapsed);

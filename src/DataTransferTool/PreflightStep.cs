@@ -39,7 +39,7 @@ namespace DataTransferTool
             split.Panel2.Controls.Add(details);
             Controls.Add(split);
             Controls.Add(bar);
-            Load += (s, e) => split.SplitterDistance = Math.Max(120, (int)(split.Height * 0.52));
+            Ui.SplitAt(split, 0.52, 120);
             list.Resize += (s, e) => list.Columns[2].Width = Math.Max(200, list.ClientSize.Width - list.Columns[0].Width - list.Columns[1].Width - 4);
 
             list.SelectedIndexChanged += (s, e) => ShowSelected();

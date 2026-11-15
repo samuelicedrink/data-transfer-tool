@@ -91,6 +91,7 @@ namespace DataTransferTool
             backButton.Enabled = current > 0 && step.CanGoBack;
             nextButton.Text = step.NextText;
             nextButton.Enabled = step.CanGoNext;
+            titleLabel.Text = step.Title;
             subtitleLabel.Text = step.Subtitle;
         }
 

@@ -12,7 +12,7 @@ namespace DataTransferTool
     {
         readonly TreeView tree = new TreeView { Name = "folderTree", Dock = DockStyle.Fill, HideSelection = false, ShowNodeToolTips = true, ShowLines = true };
         readonly ListBox selectionList = new ListBox { Name = "selectionList", Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
-        readonly Label summaryLabel = new Label { Name = "summaryLabel", Dock = DockStyle.Bottom, AutoSize = true, ForeColor = Ui.Muted, Padding = new Padding(0, 6, 0, 0) };
+        readonly Label summaryLabel = new Label { Name = "summaryLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = 48, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 6, 0, 0) };
         readonly TextBox addPathBox = Ui.TextBox("addPathBox", 300);
         readonly Label messageLabel = new Label { Name = "messageLabel", AutoSize = true, Margin = new Padding(3, 7, 3, 3) };
         int sourceCount;
@@ -39,7 +39,7 @@ namespace DataTransferTool
             split.Panel2.Controls.Add(right);
             Controls.Add(split);
             Controls.Add(bar);
-            Load += (s, e) => split.SplitterDistance = Math.Max(200, (int)(split.Width * 0.58));
+            Ui.SplitAt(split, 0.58, 200);
 
             tree.StateImageList = Ui.CheckImages(this);
             tree.BeforeExpand += (s, e) => Populate(e.Node);

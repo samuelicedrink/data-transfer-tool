@@ -88,6 +88,27 @@ namespace DataTransferTool
             return list;
         }
 
+        /// <summary>
+        /// Puts a split container's divider at a fraction of its size once it has a real size.
+        /// Setting SplitterDistance on a control that is still small throws, and an exception in a
+        /// Load handler is swallowed silently on 64-bit Windows (found in M4 testing).
+        /// </summary>
+        public static void SplitAt(SplitContainer s, double fraction, int minimum)
+        {
+            bool done = false;
+            void Apply()
+            {
+                if (done) return;
+                int total = s.Orientation == Orientation.Vertical ? s.Width : s.Height;
+                int d = Math.Max(minimum, (int)(total * fraction));
+                if (d < s.Panel1MinSize || d > total - s.Panel2MinSize - s.SplitterWidth) return;
+                s.SplitterDistance = d;
+                done = true;
+            }
+            s.SizeChanged += (a, b) => Apply();
+            s.HandleCreated += (a, b) => Apply();
+        }
+
         public static Color ColorOf(CheckStatus s) =>
             s == CheckStatus.Pass ? Good : s == CheckStatus.Warn ? Warning : s == CheckStatus.Fail ? Bad : Muted;
 
