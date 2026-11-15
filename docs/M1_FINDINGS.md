@@ -4,9 +4,20 @@ Tested 2026-11-14 on Windows 11 (build 26200, Home N), Robocopy 10.0.26100.1,
 NTFS to NTFS on a local fixed disk, with `src/DttM1Harness` against generated
 trees only. Captured logs: `tests/fixtures/m1/`.
 
-**The harness ran NOT elevated.** Everything below was tested without `/B`.
-The elevated half (does `/B` read ACL-denied files, does it change anything for
-cloud files) is still open — see "Not yet tested".
+The harness was run twice: not elevated (without `/B`) and elevated (full spec
+flag set including `/B`). Both runs finished with 0 failed checks. The OneDrive
+test was run not elevated only.
+
+## Elevated run (`/B` active)
+
+- The spec flag set verbatim copies and verifies cleanly (exit 1, 228 files identical).
+- `/B` reads past permissions: the ACL-denied file and the ACL-denied folder
+  were both copied, and the `/L` scan reported no unreadable folder.
+- `/B` does not help with locked files: the file held open by another process
+  still failed with error 32, and was picked up by the second pass once released.
+- Partial files left by a kill are stamped 1980-01-02 instead of the kill time,
+  which removes the 2-second `/FFT` edge case noted below for most of them.
+- Not checked elevated: `/B` together with `/XA:O` on cloud-only files.
 
 ## Result per question
 
@@ -25,7 +36,7 @@ Tested: `/E /B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /UNILOG`
 | Flag | Verified | Finding |
 |---|---|---|
 | `/E` | yes | Empty folders are created. |
-| `/B` | partly | Not elevated, Robocopy refuses to start: exit 16, "You do not have the Backup and Restore Files user rights". So the app must confirm elevation before launching Robocopy (already a pre-flight check). Benefit when elevated: not yet tested. |
+| `/B` | yes | Not elevated, Robocopy refuses to start (exit 16), so the app must confirm elevation first. Elevated, it copies files and folders the account has no permission to read. It does not get past locked files. |
 | `/R:1 /W:2` | yes | A locked file and an ACL-denied file each cost one 2-second wait, then are logged and skipped. No prompt. Exit code 9 (8 = some failures, 1 = some copied). |
 | `/XJ` | yes | A junction inside the tree was not followed and not created at the destination. |
 | `/COPY:DAT` | yes | Content, attributes (read-only, hidden), modified and created times all match. |
@@ -146,7 +157,7 @@ ordinary). The folder was deleted afterwards.
 
 | Item | Why | When |
 |---|---|---|
-| `/B` when elevated: ACL-denied files, cloud files | harness session was not elevated | rerun the harness elevated (one command, needs a UAC click) |
+| `/B` with `/XA:O` on cloud-only files | OneDrive test was run not elevated only | M3, when the pre-flight cloud check is built |
 | `/FFT` against a real FAT32/exFAT stick | no such volume here | M6 manual test |
 | `/XA:O` on Windows 10 | only Windows 11 available | M6 manual test |
 | EFS files | Windows Home has no EFS | M6 manual test |
