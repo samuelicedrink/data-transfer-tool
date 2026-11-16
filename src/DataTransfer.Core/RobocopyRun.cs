@@ -89,6 +89,7 @@ namespace DataTransfer.Core
             LogPath = logPath;
             Directory.CreateDirectory(Path.GetDirectoryName(logPath));
             if (File.Exists(logPath)) File.Delete(logPath);
+            Parser.LogFile = Path.GetFileName(logPath);
             tail = new LogTail(logPath, Parser.Feed);
             process = new Process
             {

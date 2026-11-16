@@ -11,7 +11,7 @@ namespace DataTransfer.Core
     public static class FailureCsv
     {
         public static readonly string[] Header =
-            { "Source path", "Destination path", "Type", "Reason", "Error code", "Windows message", "Size (bytes)", "Attempts", "Time" };
+            { "Source path", "Destination path", "Type", "Reason", "Error code", "Windows message", "Size (bytes)", "Attempts", "Time", "Log file", "Log line" };
 
         public static string Reason(FailureCategory c)
         {
@@ -38,7 +38,8 @@ namespace DataTransfer.Core
                 sb.AppendLine(string.Join(",", new[]
                 {
                     f.SourcePath, dest, f.IsDirectory ? "Folder" : "File", Reason(f.Category), f.ErrorCode.ToString(),
-                    f.Message ?? "", f.IsDirectory ? "" : f.Size.ToString(), f.Attempts.ToString(), f.Time ?? ""
+                    f.Message ?? "", f.IsDirectory ? "" : f.Size.ToString(), f.Attempts.ToString(), f.Time ?? "",
+                    f.LogFile ?? "", f.LogLine > 0 ? f.LogLine.ToString() : ""
                 }.Select(Cell)));
             }
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path)));
