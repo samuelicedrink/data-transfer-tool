@@ -30,7 +30,9 @@ namespace DataTransferTool
             Font = Ui.BaseFont;
             AutoScaleMode = AutoScaleMode.Dpi;
             StartPosition = FormStartPosition.CenterScreen;
-            Size = new Size(980, 680);
+            // v2: wider for the Modified, Size, Relevant and Advice columns, within the screen
+            var wa = Screen.PrimaryScreen.WorkingArea;
+            Size = new Size(Math.Min(1280, wa.Width - 40), Math.Min(740, wa.Height - 40));
             MinimumSize = new Size(800, 560);
 
             runStep = new RunStep(state) { CloseRequested = () => BeginInvoke((Action)Close) };

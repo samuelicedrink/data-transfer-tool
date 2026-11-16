@@ -11,6 +11,10 @@ namespace DataTransferTool
         public string Header;
         public int Width;
         public HorizontalAlignment Align = HorizontalAlignment.Left;
+        /// <summary>When above 0, the column takes this share of the grid's width (at least Width).</summary>
+        public double Share;
+
+        internal int WidthIn(int gridWidth) => Share > 0 ? Math.Max(Width, (int)(gridWidth * Share)) : Width;
     }
 
     /// <summary>
@@ -27,6 +31,8 @@ namespace DataTransferTool
         public Func<TreeNode, int, string> CellText;
         /// <summary>Colour of a node's name and cells; Empty = normal text colour.</summary>
         public Func<TreeNode, Color> NodeColor;
+        /// <summary>Colour of one cell; Empty = the row's colour.</summary>
+        public Func<TreeNode, int, Color> CellColor;
 
         public TreeGrid()
         {
@@ -51,7 +57,7 @@ namespace DataTransferTool
             get
             {
                 int x = Width - SystemInformation.VerticalScrollBarWidth;
-                foreach (var c in Columns) x -= c.Width;
+                foreach (var c in Columns) x -= c.WidthIn(Width);
                 return x;
             }
         }
@@ -104,14 +110,16 @@ namespace DataTransferTool
             for (int i = 0; i < Columns.Count; i++)
             {
                 var c = Columns[i];
+                int w = c.WidthIn(Width);
                 string text = CellText?.Invoke(e.Node, i);
                 if (!string.IsNullOrEmpty(text))
                 {
+                    Color own = CellColor?.Invoke(e.Node, i) ?? Color.Empty;
                     var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine |
                                 (c.Align == HorizontalAlignment.Right ? TextFormatFlags.Right : c.Align == HorizontalAlignment.Center ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left);
-                    TextRenderer.DrawText(g, text, Font, new Rectangle(x + 4, b.Y, c.Width - 8, b.Height), cellFore, flags);
+                    TextRenderer.DrawText(g, text, Font, new Rectangle(x + 4, b.Y, w - 8, b.Height), own.IsEmpty ? cellFore : own, flags);
                 }
-                x += c.Width;
+                x += w;
             }
         }
     }
@@ -143,10 +151,11 @@ namespace DataTransferTool
             int x = left;
             foreach (var c in grid.Columns)
             {
+                int w = c.WidthIn(grid.Width);
                 g.DrawLine(SystemPens.ControlDark, x, 3, x, Height - 4);
-                TextRenderer.DrawText(g, c.Header, Font, new Rectangle(x + 4, 0, c.Width - 8, Height), SystemColors.ControlText,
+                TextRenderer.DrawText(g, c.Header, Font, new Rectangle(x + 4, 0, w - 8, Height), SystemColors.ControlText,
                     flags | (c.Align == HorizontalAlignment.Right ? TextFormatFlags.Right : TextFormatFlags.Left));
-                x += c.Width;
+                x += w;
             }
             g.DrawLine(SystemPens.ControlDark, 0, Height - 1, Width, Height - 1);
         }

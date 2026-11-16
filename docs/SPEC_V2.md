@@ -39,8 +39,9 @@ its score.
   technician opens are scanned first; the screen never freezes.
 - WinForms has no tree with columns, so the list is a tree-grid: the native tree view with the
   names and columns drawn by the tool (keyboard use, tick boxes and UI Automation as in v1).
-- Files follow their folder (greyed box): they are copied or left out with it. Whether files
-  get tick boxes of their own is an open question for the owner (DECISIONS.md, V2-M2).
+- Files have tick boxes of their own (owner, 2026-11-15). An unticked file in a ticked folder
+  is left out (`/XF` with its full path); files ticked in an unticked folder are copied by a job
+  of their own that takes only those files. A default exclusion (`~$*` …) still applies.
 - A folder lists its first 1,000 files by name; a line counts the rest. All are in its size.
 - Cloud-only OneDrive files are counted but marked, as in v1 (they are not copied).
 
@@ -95,7 +96,9 @@ merge to `main` and tag (`v2-m1`, …).
 2. **V2-M2 Tree-grid with Modified and Size.** Owner-drawn tree-grid, files under opened
    folders, background scan. UI smoke scenario updated.
 3. **V2-M3 Relevance score and Advice.** Scoring engine and known-app catalog in the core
-   library; tests with generated trees whose files are owned by different test accounts.
+   library; tests with generated trees and simulated owners (no test accounts, see
+   DECISIONS.md). Also: files get their own tick box (owner, 2026-11-15), and a ticked
+   profile shows its AppData unticked, as it is not copied.
 4. **V2-M4 Report, manual tests, release.** Report lists the user each source was scored
    for; manual tests T20 (two real users, standard and admin, plus a domain user) and T21
    (catalog paths on a PC with the apps installed); release `v2.0.0`.

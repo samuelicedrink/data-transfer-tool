@@ -20,21 +20,37 @@ namespace DataTransfer.Core
         public IReadOnlyList<FolderNode> Children => (IReadOnlyList<FolderNode>)children ?? Array.Empty<FolderNode>();
         /// <summary>Set when the subfolders could not be listed.</summary>
         public string LoadError { get; internal set; }
+        /// <summary>
+        /// v2: names of files directly in this folder whose tick differs from the folder's own
+        /// (unticked inside a ticked folder, or ticked inside an unticked one).
+        /// </summary>
+        internal readonly HashSet<string> fileFlips = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        public IReadOnlyCollection<string> FileFlips => fileFlips;
 
         public override string ToString() => Path;
     }
 
     /// <summary>
-    /// Folder-level selection with tri-state display, loaded lazily. The model:
+    /// Folder and file selection with tri-state display, loaded lazily. The model:
     /// every node has its own Included flag; ticking a node sets it on the node and everything
     /// below; a node shows Checked when it and all its loaded descendants are included, Unchecked
     /// when none are, Mixed otherwise. A ticked node whose parent is not ticked is one Robocopy
-    /// job; unticked nodes inside it become /XD.
+    /// job; unticked nodes inside it become /XD. v2: a file follows its folder unless flipped;
+    /// unticked files in a ticked folder become /XF, ticked files in an unticked folder a job of
+    /// their own that copies only those files.
     /// </summary>
     public sealed class FolderTree
     {
         readonly Func<string, IEnumerable<string>> listSubfolders;
         public List<FolderNode> Roots { get; } = new List<FolderNode>();
+        /// <summary>
+        /// v2: folders that stay unticked when a folder above them is ticked (the profile-level
+        /// exclusions such as each profile's AppData), so the tree shows what is really copied.
+        /// Ticking such a folder itself, or a folder inside it, still works.
+        /// </summary>
+        public Func<string, bool> LeaveUnticked { get; set; }
+
+        bool Skip(string path) => LeaveUnticked != null && LeaveUnticked(path);
 
         /// <param name="roots">Usually the fixed drives ("C:\").</param>
         /// <param name="listSubfolders">Full paths of a folder's subfolders; default lists the file system.</param>
@@ -69,7 +85,7 @@ namespace DataTransfer.Core
             try
             {
                 foreach (var p in listSubfolders(node.Path))
-                    node.children.Add(new FolderNode { Path = p, Name = System.IO.Path.GetFileName(p.TrimEnd('\\')), Parent = node, Included = node.Included });
+                    node.children.Add(new FolderNode { Path = p, Name = System.IO.Path.GetFileName(p.TrimEnd('\\')), Parent = node, Included = node.Included && !Skip(p) });
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { node.LoadError = ex.Message; }
             return node.children;
@@ -77,11 +93,13 @@ namespace DataTransfer.Core
 
         public TriState State(FolderNode node)
         {
+            if (node.fileFlips.Count > 0) return TriState.Mixed;
             if (node.children == null || node.children.Count == 0) return node.Included ? TriState.Checked : TriState.Unchecked;
             bool all = node.Included, none = !node.Included;
             foreach (var c in node.children)
             {
                 var s = State(c);
+                if (s == TriState.Unchecked && node.Included && Skip(c.Path)) continue; // left out by rule, not by the technician
                 if (s != TriState.Checked) all = false;
                 if (s != TriState.Unchecked) none = false;
                 if (!all && !none) return TriState.Mixed;
@@ -92,10 +110,27 @@ namespace DataTransfer.Core
         /// <summary>Click on a node: Checked becomes Unchecked; Unchecked and Mixed become Checked.</summary>
         public void Toggle(FolderNode node) => SetSubtree(node, State(node) != TriState.Checked);
 
-        public void SetSubtree(FolderNode node, bool included)
+        public void SetSubtree(FolderNode node, bool included) => SetSubtree(node, included, true);
+
+        void SetSubtree(FolderNode node, bool included, bool top)
         {
-            node.Included = included;
-            if (node.children != null) foreach (var c in node.children) SetSubtree(c, included);
+            node.Included = included && (top || !Skip(node.Path));
+            node.fileFlips.Clear();
+            if (node.children != null) foreach (var c in node.children) SetSubtree(c, node.Included, false);
+        }
+
+        /// <summary>v2: whether a file directly in <paramref name="folder"/> is copied.</summary>
+        public bool IsFileIncluded(FolderNode folder, string fileName) => folder.Included != folder.fileFlips.Contains(fileName);
+
+        /// <summary>v2: ticks or unticks one file, leaving the folder and its other files as they are.</summary>
+        public void ToggleFile(FolderNode folder, string fileName)
+        {
+            if (!folder.fileFlips.Remove(fileName)) folder.fileFlips.Add(fileName);
+        }
+
+        public void SetFile(FolderNode folder, string fileName, bool included)
+        {
+            if (IsFileIncluded(folder, fileName) != included) ToggleFile(folder, fileName);
         }
 
         public void Clear()
@@ -150,6 +185,12 @@ namespace DataTransfer.Core
                 current.ExcludedSubfolders.Add(PathUtil.Trim(node.Path));
                 current = null; // an included folder further down is a job of its own
             }
+            if (node.fileFlips.Count > 0)
+            {
+                var names = node.fileFlips.OrderBy(n => n, StringComparer.OrdinalIgnoreCase);
+                if (node.Included) current.ExcludedFiles.AddRange(names.Select(n => System.IO.Path.Combine(node.Path, n)));
+                else list.Add(new SourceSelection { Path = PathUtil.Trim(node.Path), Files = names.ToList() });
+            }
             if (node.children != null) foreach (var c in node.children) Collect(c, current, list);
         }
 
@@ -159,9 +200,15 @@ namespace DataTransfer.Core
             Clear();
             var all = sources.ToList();
             // outer folders first so that nested jobs and exclusions land on top
-            foreach (var s in all.OrderBy(s => s.Path.Length)) Include(s.Path);
+            foreach (var s in all.Where(s => !s.FilesOnly).OrderBy(s => s.Path.Length)) Include(s.Path);
             foreach (var x in all.SelectMany(s => s.ExcludedSubfolders).OrderBy(x => x.Length)) Exclude(x);
-            foreach (var s in all.Where(s => all.Any(o => o != s && PathUtil.IsSameOrUnder(s.Path, o.Path)))) Include(s.Path);
+            foreach (var s in all.Where(s => !s.FilesOnly && all.Any(o => o != s && PathUtil.IsSameOrUnder(s.Path, o.Path)))) Include(s.Path);
+            // files last: ticking or unticking a folder resets its files
+            foreach (var s in all)
+            {
+                foreach (var x in s.ExcludedFiles) { var f = Find(System.IO.Path.GetDirectoryName(x)); if (f != null) SetFile(f, System.IO.Path.GetFileName(x), false); }
+                if (s.FilesOnly) { var f = Find(s.Path); if (f != null) foreach (var n in s.Files) SetFile(f, n, true); }
+            }
         }
     }
 

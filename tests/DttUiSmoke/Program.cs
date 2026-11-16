@@ -10,6 +10,7 @@
 // Scenario C: start a copy and close the window: it must cancel and exit without any dialog.
 // Scenario G (v2): user picker lists this PC's users with access level; picking one ticks nothing.
 // Scenario H (v2): tree-grid: folder size and newest date, files listed under folders, "more files" line.
+// Scenario I (v2): relevance and Advice for the picked user, on folders and files; nothing ticked by it.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -37,7 +38,7 @@ static class Program
         Directory.CreateDirectory(shots);
         try
         {
-            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEFGH"; // D resumes the job C leaves behind
+            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEFGHI"; // D resumes the job C leaves behind
             if (only.Contains("A")) ScenarioA();
             if (only.Contains("B")) ScenarioB();
             if (only.Contains("C")) ScenarioC();
@@ -46,6 +47,7 @@ static class Program
             if (only.Contains("F")) ScenarioF();
             if (only.Contains("G")) ScenarioG();
             if (only.Contains("H")) ScenarioH();
+            if (only.Contains("I")) ScenarioI();
         }
         catch (Exception ex) { Fail("crashed: " + ex); Shot("error"); }
         finally { try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { } }
@@ -414,13 +416,31 @@ static class Program
         Check(WaitFor(() => Text("detailLabel").StartsWith(first.FullName + ": ") && Text("detailLabel").Contains("modified " + first.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), 10),
               "file line shows size and modified date: " + First(Text("detailLabel")));
 
-        // a file has no tick box of its own
-        int jobs = Items("selectionList").Count;
+        // files have tick boxes of their own (owner, 2026-11-15)
         PressSpace(tree);
-        Check(WaitFor(() => Text("messageLabel").StartsWith("Files are copied or left out with their folder"), 5), "Space on a file explains that files follow their folder");
-        Check(Items("selectionList").Count == jobs && Items("selectionList").Contains(small), "selection unchanged");
+        Check(WaitFor(() => Items("selectionList").Contains(small + "   (without 1 file)"), 5), "Space unticks one file: " + string.Join(" | ", Items("selectionList")));
+        PressSpace(tree);
+        Check(WaitFor(() => Items("selectionList").SequenceEqual(new[] { small }), 5), "Space ticks it again");
 
+        // a single file in an unticked folder becomes a job of its own
         var sub = TreeItem(docs, "Sub");
+        ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Thread.Sleep(300);
+        PressSpace(tree);
+        Expand(sub);
+        string subDir = Path.Combine(small, "Docs", "Sub");
+        var subFile = new DirectoryInfo(subDir).GetFiles().OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).First();
+        ((SelectionItemPattern)TreeItem(sub, subFile.Name).GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Thread.Sleep(300);
+        PressSpace(tree);
+        Check(WaitFor(() => Items("selectionList").Contains(subDir + "   (1 file only)") && Items("selectionList").Contains(small + "   (without 1 subfolder)"), 5),
+              "unticked folder with one ticked file: " + string.Join(" | ", Items("selectionList")));
+        Check(Text("detailLabel").Contains("Ticked on its own"), "the file line says the file is ticked on its own");
+        Shot("h-file-ticks");
+        Invoke(Id("clearButton"));
+        TickFolder(small);
+
+        ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
         ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
         Check(WaitFor(() => Text("detailLabel").StartsWith(Path.Combine(small, "Docs", "Sub") + ": "), 10), "subfolder numbers are ready at once (kept from the parent's scan)");
         Shot("h-tree-grid");
@@ -434,6 +454,58 @@ static class Program
         ((SelectionItemPattern)wideItem.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
         Check(WaitFor(() => Text("detailLabel").StartsWith($"{wide}: 1,200 file(s), 11.72 KB"), 20), "the folder line counts all 1,200: " + First(Text("detailLabel")));
         Shot("h-many-files");
+        proc.Kill(); proc.WaitForExit(5000);
+    }
+
+    static void ScenarioI()
+    {
+        Console.WriteLine("== I: relevance for the picked user");
+        Launch();
+        var tree = Id("folderTree");
+        TickFolder(small);
+        Check(WaitFor(() => Text("detailLabel").Contains("Pick a user at the top left"), 60), "with All users there is no estimate, only a hint");
+
+        var combo = Id("userCombo");
+        Check(WaitFor(() => combo.Current.IsEnabled, 60), "user list loads");
+        var names = ComboItems(combo);
+        string me = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+        string shortName = me.Substring(me.LastIndexOf('\\') + 1);
+        int idx = names.FindIndex(n => n.StartsWith(me + "  (", StringComparison.OrdinalIgnoreCase));
+        Check(idx > 0, "current user is in the list");
+        if (idx <= 0) { proc.Kill(); return; }
+        int jobs = Items("selectionList").Count;
+        var h = new IntPtr(combo.Current.NativeWindowHandle);
+        for (int i = 0; i < idx; i++) { PostMessage(h, 0x0100, new IntPtr(0x28), new IntPtr(0x01500001)); PostMessage(h, 0x0101, new IntPtr(0x28), new IntPtr(unchecked((int)0xC1500001))); }
+
+        // the generated tree was written by this account: its files are owned by it (or by
+        // Administrators when written elevated), and it is not inside a profile
+        string line = "";
+        Check(WaitFor(() => (line = Text("detailLabel")).Contains($"Relevant to {shortName}: "), 60), "folder line gives the relevance for the picked user: " + First(line.Replace("\r\n", " | ")));
+        var m = System.Text.RegularExpressions.Regex.Match(line, $@"Relevant to {System.Text.RegularExpressions.Regex.Escape(shortName)}: (\d+) %\. (.+)\.$", System.Text.RegularExpressions.RegexOptions.Singleline);
+        Check(m.Success, "score and Advice present");
+        if (m.Success)
+        {
+            int score = int.Parse(m.Groups[1].Value);
+            string advice = m.Groups[2].Value;
+            string band = score >= 75 ? "Likely " + shortName + "'s" : score >= 40 ? "Review" : null;
+            Check(band == null ? advice.StartsWith("Probably not") || advice.StartsWith("Program files") : advice.StartsWith(band), $"Advice band matches the score: {score} % \"{First(advice)}\"");
+            Check(advice.Contains("owned by " + shortName) || advice.Contains("owned by Administrators"), "Advice names the owner");
+            Check(!advice.Contains("S-1-"), "no SID in Advice");
+        }
+        Check(Items("selectionList").Count == jobs, "picking a user ticks nothing");
+
+        // a file row has its own estimate
+        var smallItem = TreeItem(tree, Path.GetFileName(small));
+        Expand(smallItem);
+        var pics = TreeItem(smallItem, "Pictures");
+        Expand(pics);
+        var pic = new DirectoryInfo(Path.Combine(small, "Pictures")).GetFiles().OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).First();
+        ((SelectionItemPattern)TreeItem(pics, pic.Name).GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Check(WaitFor(() => Text("detailLabel").StartsWith(pic.FullName + ": ") && Text("detailLabel").Contains($"Relevant to {shortName}: "), 10), "a file has its own estimate: " + First(Text("detailLabel").Replace("\r\n", " | ")));
+        Shot("i-relevance");
+
+        for (int i = 0; i < idx; i++) { PostMessage(h, 0x0100, new IntPtr(0x26), new IntPtr(0x01480001)); PostMessage(h, 0x0101, new IntPtr(0x26), new IntPtr(unchecked((int)0xC1480001))); }
+        Check(WaitFor(() => Text("detailLabel").Contains("Pick a user at the top left"), 10), "back to All users: no estimate");
         proc.Kill(); proc.WaitForExit(5000);
     }
 

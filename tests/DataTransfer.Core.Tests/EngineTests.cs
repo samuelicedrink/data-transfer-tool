@@ -177,6 +177,59 @@ namespace DataTransfer.Core.Tests
         }
 
         [Test]
+        public void FileTicks_UntickedFilesLeftOut_SingleFilesFromUntickedFolderCopied()
+        {
+            // v2 (owner, 2026-11-15): files have tick boxes of their own
+            var rng = new Random(7);
+            string src = Path.Combine(root, "t9", "src"), dest = Path.Combine(root, "t9", "dest");
+            Write(Path.Combine(src, "keep.txt"), 100, rng);
+            Write(Path.Combine(src, "drop.txt"), 200, rng);
+            Write(Path.Combine(src, "sub", "drop.txt"), 300, rng);          // same name elsewhere: still copied
+            Write(Path.Combine(src, "off", "wanted.docx"), 400, rng);
+            Write(Path.Combine(src, "off", "unwanted.docx"), 500, rng);
+            Write(Path.Combine(src, "off", "deeper", "no.txt"), 600, rng);
+
+            var tree = new FolderTree(new[] { src });
+            Assert.That(tree.Include(src));
+            Assert.That(tree.Exclude(Path.Combine(src, "off")));
+            var top = tree.Find(src); var off = tree.Find(Path.Combine(src, "off"));
+            tree.ToggleFile(top, "drop.txt");
+            tree.ToggleFile(off, "wanted.docx");
+            Assert.That(tree.State(top), Is.EqualTo(TriState.Mixed));
+            Assert.That(tree.IsFileIncluded(top, "drop.txt"), Is.False);
+            Assert.That(tree.IsFileIncluded(off, "wanted.docx"));
+
+            var job = NewJob(dest);
+            job.Sources = tree.ToSources();
+            Assert.That(job.Sources.Select(s => s.Describe()), Is.EqualTo(new[] { src + "   (without 1 subfolder and 1 file)", Path.Combine(src, "off") + "   (1 file only)" }));
+
+            // the tool's own count and Robocopy's /L scan agree
+            var walk = SourceWalker.Walk(job, new ProfileInfo(), CancellationToken.None);
+            var scan = NewEngine(job).Scan(CancellationToken.None);
+            Assert.That(walk.EligibleFiles, Is.EqualTo(3));
+            Assert.That(walk.EligibleBytes, Is.EqualTo(100 + 300 + 400));
+            Assert.That(scan.Totals.FilesCopied, Is.EqualTo(walk.EligibleFiles), "Robocopy scan");
+            Assert.That(scan.Totals.BytesCopied, Is.EqualTo(walk.EligibleBytes));
+
+            Assert.That(NewEngine(job).Run(CancellationToken.None), Is.EqualTo(JobOutcome.Completed));
+            string[] copied = { "keep.txt", @"sub\drop.txt", @"off\wanted.docx" }, notCopied = { "drop.txt", @"off\unwanted.docx", @"off\deeper\no.txt" };
+            foreach (var f in copied) Assert.That(File.Exists(job.DestinationFor(Path.Combine(src, f))), "copied: " + f);
+            foreach (var f in notCopied) Assert.That(File.Exists(job.DestinationFor(Path.Combine(src, f))), Is.False, "left out: " + f);
+            Assert.That(job.Totals().FilesCopied, Is.EqualTo(3));
+
+            // resume restores the same ticks
+            var again = new FolderTree(new[] { src });
+            again.Apply(job.Sources);
+            Assert.That(again.ToSources().Select(s => s.Describe()), Is.EqualTo(job.Sources.Select(s => s.Describe())));
+            Assert.That(again.IsFileIncluded(again.Find(src), "drop.txt"), Is.False);
+            Assert.That(again.IsFileIncluded(again.Find(Path.Combine(src, "off")), "wanted.docx"));
+
+            // ticking a folder resets its files
+            again.Toggle(again.Find(src));
+            Assert.That(again.ToSources().Select(s => s.Describe()), Is.EqualTo(new[] { src }));
+        }
+
+        [Test]
         public void AppData_ExcludedOnlyDirectlyUnderAProfile()
         {
             var rng = new Random(2);
