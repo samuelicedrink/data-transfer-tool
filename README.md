@@ -21,7 +21,7 @@ The tool is the single file `DataTransferTool.exe` (built at `src\DataTransferTo
 4. **Destination:** a folder on a USB or local drive, or a network share with user name and password. Press *Test destination*.
 5. **Pre-flight:** fix or acknowledge every warning, then *Start copy*.
 6. **Run:** wait for *Finished*. Files land in `<destination>\<COMPUTERNAME>\<drive>\<original path>`.
-7. **Report:** totals and the files that were not copied, with reasons. *Retry failed* tries them again; the list is also saved as a CSV in the log folder. Each CSV row names the Robocopy log file and the line number of its error entry, so it can be looked up in the `Logs` folder.
+7. **Report:** totals and the files that were not copied, with reasons. *Retry failed* tries them again; nothing in the copy is left Hidden or System, so every copied folder shows in Explorer (Options can switch this off). The list is also saved as a CSV in the log folder. Each CSV row names the Robocopy log file and the line number of its error entry, so it can be looked up in the `Logs` folder.
 
 If a copy is cancelled, the destination fills up, or the PC restarts, start the tool again from the same stick: it offers to resume the job. For a network share, tick *Save credentials for resume* so the password does not have to be typed again (it is stored encrypted, readable only by the same Windows account on the same PC).
 

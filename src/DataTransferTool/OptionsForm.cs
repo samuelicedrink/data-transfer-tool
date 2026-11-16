@@ -15,6 +15,8 @@ namespace DataTransferTool
         readonly CheckBox backup = new CheckBox { Name = "backupCheck", AutoSize = true, Text = "Backup mode (/B): read files regardless of their permissions. Needs administrator." };
         readonly CheckBox cloud = new CheckBox { Name = "cloudCheck", AutoSize = true, Text = "Skip cloud-only OneDrive files (/XA:O) instead of downloading them." };
 
+        readonly CheckBox visible = new CheckBox { Name = "visibleCheck", AutoSize = true, Text = "Make copied files and folders visible: remove the Hidden and System attributes at the destination." };
+
         static TextBox List(string name) => new TextBox { Name = name, Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true, Dock = DockStyle.Fill, Height = 110 };
         static NumericUpDown Number(string name, int min, int max) => new NumericUpDown { Name = name, Minimum = min, Maximum = max, Width = 80 };
 
@@ -59,6 +61,7 @@ namespace DataTransferTool
             settings.Controls.Add(numbers);
             settings.Controls.Add(backup);
             settings.Controls.Add(cloud);
+            settings.Controls.Add(visible);
             grid.Controls.Add(settings, 0, 4);
             grid.SetColumnSpan(settings, 2);
 
@@ -91,6 +94,7 @@ namespace DataTransferTool
             wait.Value = Math.Max(wait.Minimum, Math.Min(wait.Maximum, o.WaitSeconds));
             backup.Checked = o.BackupMode;
             cloud.Checked = o.ExcludeCloudOnly;
+            visible.Checked = !o.KeepHiddenAttributes;
         }
 
         static System.Collections.Generic.List<string> Lines(TextBox t) =>
@@ -107,6 +111,7 @@ namespace DataTransferTool
             o.WaitSeconds = (int)wait.Value;
             o.BackupMode = backup.Checked;
             o.ExcludeCloudOnly = cloud.Checked;
+            o.KeepHiddenAttributes = !visible.Checked;
             job.Preflight.KnownApps = Lines(appsBox);
             job.Preflight.AppCloseTimeoutSeconds = (int)timeout.Value;
         }

@@ -46,9 +46,9 @@ namespace DataTransfer.Core
     /// </summary>
     public static class SourceWalker
     {
-        const uint FILE_ATTRIBUTE_DIRECTORY = 0x10, FILE_ATTRIBUTE_REPARSE_POINT = 0x400, FILE_ATTRIBUTE_OFFLINE = 0x1000,
+        internal const uint FILE_ATTRIBUTE_DIRECTORY = 0x10, FILE_ATTRIBUTE_REPARSE_POINT = 0x400, FILE_ATTRIBUTE_OFFLINE = 0x1000,
                    FILE_ATTRIBUTE_ENCRYPTED = 0x4000, FILE_ATTRIBUTE_RECALL_ON_OPEN = 0x40000, FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x400000;
-        const uint IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003, IO_REPARSE_TAG_SYMLINK = 0xA000000C;
+        internal const uint IO_REPARSE_TAG_MOUNT_POINT = 0xA0000003, IO_REPARSE_TAG_SYMLINK = 0xA000000C;
 
         /// <summary>
         /// Cloud-only test. A .NET process is shown these files without OFFLINE (M1 finding), so the
@@ -81,7 +81,7 @@ namespace DataTransfer.Core
                         string dir = stack.Pop();
                         result.Folders++;
                         onFolder?.Invoke(dir);
-                        Enumerate(dir, buffer, result, (name, attrs, size, tag) =>
+                        Enumerate(dir, buffer, err => Fail(dir, err, result), (name, attrs, size, tag, written) =>
                         {
                             string full = dir.EndsWith("\\") ? dir + name : dir + "\\" + name;
                             if ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0)
@@ -123,25 +123,25 @@ namespace DataTransfer.Core
 
         // ------------------------------------------------------------ directory enumeration
 
-        const int BufferSize = 256 * 1024;
+        internal const int BufferSize = 256 * 1024;
         const int FileFullDirectoryInfo = 14, FileFullDirectoryRestartInfo = 15;
 
         /// <summary>
         /// Lists one folder through a handle opened with backup semantics, so that with the backup
         /// privilege enabled it reads folders the account has no permission for, as Robocopy /B does.
         /// </summary>
-        static void Enumerate(string dir, IntPtr buffer, WalkResult result, Action<string, uint, long, uint> onEntry)
+        internal static void Enumerate(string dir, IntPtr buffer, Action<int> onError, Action<string, uint, long, uint, long> onEntry)
         {
             using (var h = CreateFileW(PathUtil.Long(dir), 0x0001 /* FILE_LIST_DIRECTORY */, 7, IntPtr.Zero, 3, 0x02000000 /* BACKUP_SEMANTICS */, IntPtr.Zero))
             {
-                if (h.IsInvalid) { Fail(dir, Marshal.GetLastWin32Error(), result); return; }
+                if (h.IsInvalid) { onError(Marshal.GetLastWin32Error()); return; }
                 bool first = true;
                 while (true)
                 {
                     if (!GetFileInformationByHandleEx(h, first ? FileFullDirectoryRestartInfo : FileFullDirectoryInfo, buffer, BufferSize))
                     {
                         int err = Marshal.GetLastWin32Error();
-                        if (err != 18 /* NO_MORE_FILES */ && !(first && err == 2)) Fail(dir, err, result);
+                        if (err != 18 /* NO_MORE_FILES */ && !(first && err == 2)) onError(err);
                         return;
                     }
                     first = false;
@@ -149,12 +149,13 @@ namespace DataTransfer.Core
                     while (true)
                     {
                         int next = Marshal.ReadInt32(p, 0);
+                        long written = Marshal.ReadInt64(p, 24); // LastWriteTime (FILETIME, UTC)
                         long size = Marshal.ReadInt64(p, 40);
                         uint attrs = (uint)Marshal.ReadInt32(p, 56);
                         int nameBytes = Marshal.ReadInt32(p, 60);
                         uint tag = (uint)Marshal.ReadInt32(p, 64); // EaSize holds the reparse tag for reparse points
                         string name = Marshal.PtrToStringUni(IntPtr.Add(p, 68), nameBytes / 2);
-                        if (name != "." && name != "..") onEntry(name, attrs, size, tag);
+                        if (name != "." && name != "..") onEntry(name, attrs, size, tag, written);
                         if (next == 0) break;
                         p = IntPtr.Add(p, next);
                     }

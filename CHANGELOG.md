@@ -9,6 +9,25 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-11-15
+
+### Fixed
+
+- Copied folders could be invisible in Explorer. Robocopy gives a destination folder the attributes of its source folder, so the copy of a whole drive (`C:\` to `<Dest>\<COMPUTERNAME>\C`) arrived Hidden + System like the drive root, which Explorer hides even with *Hidden items* switched on. Found by the owner in a real-life test. Now nothing at the destination is left Hidden or System: files are copied with `/A-:SH`, and after each folder job the tool clears both attributes on every folder and file under that job's destination (Robocopy has no flag that does this for folders; checked with `/DCOPY:DT` too). When a copy is cancelled, the top folders are still cleared. A destination left hidden by an earlier version is repaired by running the same job again (nothing is recopied). Only the destination is changed, never the source; Read-only is kept.
+
+### Added
+
+- Options: *Make copied files and folders visible* (on by default). Switching it off copies the Hidden and System attributes as v1.0.0 to v1.0.2 did.
+
+### Changed
+
+- Flag set: `/A-:SH` added by default (deviation from the M1 flag set, at the owner's request; see above).
+
+### Test findings (v1.0.3, 2026-11-15, not elevated)
+
+- Reproduced on a generated tree whose top folder is Hidden + System: the old flags leave the destination folder Hidden + System; `/A-:SH` fixes files only; a second Robocopy run puts a folder's attributes back, so the tool clears them after every run.
+- New engine test: hidden and system files and folders arrive visible, Read-only kept, source unchanged, a second run copies nothing and stays visible, an old hidden destination is repaired, and the option off keeps the attributes.
+
 ## [1.0.2] - 2026-11-15
 
 ### Added

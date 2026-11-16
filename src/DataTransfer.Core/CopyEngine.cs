@@ -156,6 +156,36 @@ namespace DataTransfer.Core
 
         AttemptEnd RunSource(SourceSelection src, CancellationToken ct)
         {
+            var end = CopySource(src, ct);
+            return job.Options.KeepHiddenAttributes ? end : MakeVisible(src, end, ct);
+        }
+
+        /// <summary>
+        /// Clears Hidden and System at the destination of one folder job. Robocopy copies a
+        /// folder's attributes, so the copy of a drive root would otherwise be invisible in Explorer.
+        /// After an interrupted pass only the top folders are cleared (quick); the whole tree is
+        /// done when the folder job has finished.
+        /// </summary>
+        AttemptEnd MakeVisible(SourceSelection src, AttemptEnd end, CancellationToken ct)
+        {
+            string dest;
+            try { dest = job.DestinationFor(src.Path); } catch (ArgumentException) { return end; }
+            var r = Unhide.ClearChain(dest, job.DestinationRoot);
+            if (end != AttemptEnd.Finished) return end;
+            Unhide.ClearTree(dest, ct, r);
+            if (r.Cancelled)
+            {
+                // not finished: the next run goes over this folder job again (files already there are skipped)
+                Interrupted(src, src.Totals.FilesCopied, src.Totals.BytesCopied, src.CountsApproximate);
+                return AttemptEnd.Cancelled;
+            }
+            if (r.Cleared > 0 || r.Failed > 0)
+                Say($"Made {r.Cleared:N0} hidden item(s) visible at the destination" + (r.Failed > 0 ? $"; {r.Failed:N0} could not be changed ({r.FirstError})" : ""));
+            return end;
+        }
+
+        AttemptEnd CopySource(SourceSelection src, CancellationToken ct)
+        {
             // copied counts carry over from an interrupted earlier session
             long copiedFiles = src.Totals.FilesCopied, copiedBytes = src.Totals.BytesCopied;
             bool approximate = src.CountsApproximate;
@@ -284,6 +314,10 @@ namespace DataTransfer.Core
                 t.BytesSkipped = Math.Max(0, t.BytesTotal - t.BytesCopied - t.BytesFailed);
                 src.Status = src.Failures.Count > 0 ? SourceStatus.CompletedWithErrors : SourceStatus.Completed;
                 SaveState(job);
+                // a retried folder is created by Robocopy with its source attributes again
+                if (folderRetried && !job.Options.KeepHiddenAttributes)
+                    foreach (var d in group.Where(f => f.IsDirectory))
+                        try { Unhide.ClearTree(job.DestinationFor(d.SourcePath), ct); } catch (ArgumentException) { }
                 Say($"Retry for {src.Path}: {retried.Count - still.Keys.Count(retried.Contains)} of {retried.Count} resolved");
             }
             return AttemptEnd.Finished;
