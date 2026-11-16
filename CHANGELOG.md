@@ -31,6 +31,7 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Changed
 
+- Select step: ticking a profile (or a folder above it) leaves that profile's `AppData` unticked in the tree, because the copy leaves it out (Options, profile-level exclusions). Before, the tree showed it ticked, so an app-settings folder ticked inside it looked copied but was not. Now a folder such as `AppData\Roaming\Adobe` can be ticked on its own and becomes a job of its own that is copied. A folder left out by this rule does not make the profile show as mixed (V2-M3).
 - v2 keeps its job and credential files under `%ProgramData%\DataTransferTool\v2` when the exe's folder is read-only, so v1 and v2 never resume each other's job (V2-M1).
 
 ### Fixed

@@ -43,6 +43,14 @@ namespace DataTransfer.Core
     {
         readonly Func<string, IEnumerable<string>> listSubfolders;
         public List<FolderNode> Roots { get; } = new List<FolderNode>();
+        /// <summary>
+        /// v2: folders that stay unticked when a folder above them is ticked (the profile-level
+        /// exclusions such as each profile's AppData), so the tree shows what is really copied.
+        /// Ticking such a folder itself, or a folder inside it, still works.
+        /// </summary>
+        public Func<string, bool> LeaveUnticked { get; set; }
+
+        bool Skip(string path) => LeaveUnticked != null && LeaveUnticked(path);
 
         /// <param name="roots">Usually the fixed drives ("C:\").</param>
         /// <param name="listSubfolders">Full paths of a folder's subfolders; default lists the file system.</param>
@@ -77,7 +85,7 @@ namespace DataTransfer.Core
             try
             {
                 foreach (var p in listSubfolders(node.Path))
-                    node.children.Add(new FolderNode { Path = p, Name = System.IO.Path.GetFileName(p.TrimEnd('\\')), Parent = node, Included = node.Included });
+                    node.children.Add(new FolderNode { Path = p, Name = System.IO.Path.GetFileName(p.TrimEnd('\\')), Parent = node, Included = node.Included && !Skip(p) });
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { node.LoadError = ex.Message; }
             return node.children;
@@ -91,6 +99,7 @@ namespace DataTransfer.Core
             foreach (var c in node.children)
             {
                 var s = State(c);
+                if (s == TriState.Unchecked && node.Included && Skip(c.Path)) continue; // left out by rule, not by the technician
                 if (s != TriState.Checked) all = false;
                 if (s != TriState.Unchecked) none = false;
                 if (!all && !none) return TriState.Mixed;
@@ -101,11 +110,13 @@ namespace DataTransfer.Core
         /// <summary>Click on a node: Checked becomes Unchecked; Unchecked and Mixed become Checked.</summary>
         public void Toggle(FolderNode node) => SetSubtree(node, State(node) != TriState.Checked);
 
-        public void SetSubtree(FolderNode node, bool included)
+        public void SetSubtree(FolderNode node, bool included) => SetSubtree(node, included, true);
+
+        void SetSubtree(FolderNode node, bool included, bool top)
         {
-            node.Included = included;
+            node.Included = included && (top || !Skip(node.Path));
             node.fileFlips.Clear();
-            if (node.children != null) foreach (var c in node.children) SetSubtree(c, included);
+            if (node.children != null) foreach (var c in node.children) SetSubtree(c, node.Included, false);
         }
 
         /// <summary>v2: whether a file directly in <paramref name="folder"/> is copied.</summary>

@@ -29,6 +29,35 @@ namespace DataTransfer.Core.Tests
         static FolderTree Tree() => new FolderTree(new[] { @"C:\", @"D:\" }, List);
 
         [Test]
+        public void LeaveUnticked_ProfileFolderStaysUnticked_ButCanBeTickedOnItsOwn()
+        {
+            // v2: e.g. each profile's AppData, which the copy leaves out
+            var t = Tree();
+            t.LeaveUnticked = p => p.Equals(@"C:\Users\Anna\Pictures", StringComparison.OrdinalIgnoreCase);
+            var anna = t.Find(@"C:\Users\Anna");
+            t.Toggle(anna);
+            var pics = t.Find(@"C:\Users\Anna\Pictures");
+            Assert.That(pics.Included, Is.False, "left unticked under a ticked profile");
+            Assert.That(t.State(anna), Is.EqualTo(TriState.Checked), "a folder left out by rule does not make the profile mixed");
+            Assert.That(t.ToSources().Single().ExcludedSubfolders, Is.EqualTo(new[] { @"C:\Users\Anna\Pictures" }));
+            t.Toggle(anna);
+            Assert.That(t.ToSources(), Is.Empty, "a second click unticks the profile");
+
+            t.Toggle(anna);
+            t.Toggle(pics);
+            Assert.That(pics.Included, "ticked by the technician");
+            Assert.That(t.ToSources().Select(s => s.Path), Is.EqualTo(new[] { @"C:\Users\Anna" }));
+            Assert.That(t.ToSources().Single().ExcludedSubfolders, Is.Empty);
+
+            // ticking C:\Users loads Anna lazily: the rule applies to folders loaded later too
+            var t2 = Tree();
+            t2.LeaveUnticked = t.LeaveUnticked;
+            t2.Include(@"C:\Users");
+            Assert.That(t2.Find(@"C:\Users\Anna\Pictures").Included, Is.False);
+            Assert.That(t2.Find(@"C:\Users\Anna\Documents").Included);
+        }
+
+        [Test]
         public void Children_AreLoadedOnlyWhenAsked()
         {
             listCalls = 0;

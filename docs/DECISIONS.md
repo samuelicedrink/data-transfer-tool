@@ -8,6 +8,16 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — AppData shown unticked under a ticked profile (V2-M3, to be reviewed by the owner)
+
+- The copy leaves each profile's `AppData` out (an Options setting since M2), but the tree showed
+  it ticked under a ticked profile. App settings the owner wants kept (Photoshop presets and so
+  on) live there, so a folder ticked inside it would have been silently left out.
+- Now the tree leaves those folders unticked when a folder above them is ticked, and ticking a
+  folder inside `AppData` makes it a job of its own, which is copied. Nothing is ticked for the
+  technician; the default copy is unchanged.
+- Who: Claude, from the owner's aim of keeping app settings (2026-11-15).
+
 ## 2026-11-15 — Owner approved V2-M2; files get their own tick box; v1 fix released
 
 - V2-M2 merged into `main` and tagged `v2-m2`. V2-M3 starts on `v2-m3-relevance`.

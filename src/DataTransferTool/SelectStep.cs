@@ -126,7 +126,12 @@ namespace DataTransferTool
             LoadUsers();
             scanner = new FolderScanner(State.Job.Options.BackupMode);
             scanTimer.Start();
-            State.Tree = new FolderTree(FolderTree.FixedDrives());
+            State.Tree = new FolderTree(FolderTree.FixedDrives())
+            {
+                // each profile's AppData (Options) shows unticked when the profile is ticked, as it is not copied
+                LeaveUnticked = path => RobocopyCommandBuilder.ProfileExclusions(Path.GetDirectoryName(path.TrimEnd('\\')) ?? path, State.Job.Options.ExcludeProfileDirs, State.Profiles)
+                                        .Any(x => string.Equals(PathUtil.Trim(x), PathUtil.Trim(path), StringComparison.OrdinalIgnoreCase))
+            };
             tree.BeginUpdate();
             foreach (var r in State.Tree.Roots) tree.Nodes.Add(NewNode(r));
             tree.EndUpdate();
