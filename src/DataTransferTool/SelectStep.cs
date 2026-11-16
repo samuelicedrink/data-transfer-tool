@@ -135,7 +135,7 @@ namespace DataTransferTool
                 if (!(tn.Tag is FolderNode n)) continue;
                 int i = (int)State.Tree.State(n);
                 if (tn.StateImageIndex != i) tn.StateImageIndex = i;
-                if (tn.IsExpanded || tn.Nodes.Count > 1) RefreshImages(tn.Nodes);
+                if (!(tn.Nodes.Count == 1 && tn.Nodes[0].Tag == null)) RefreshImages(tn.Nodes); // skip only a bare placeholder
             }
         }
 

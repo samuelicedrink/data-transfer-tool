@@ -9,8 +9,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-15
+
 ### Fixed
 
+- Folder tree: a collapsed folder with exactly one loaded subfolder kept a stale tick box on that subfolder after the folder was ticked or unticked (only folders with two or more children were refreshed). The selection itself was right; only the box was wrong. Found while building v2.
 - `scripts\Build-Release.ps1` stopped at `git worktree add` under Windows PowerShell 5.1, which treats git's progress messages as errors; it now checks git's exit code instead.
 
 ## [1.0.0] - 2026-11-15
