@@ -114,7 +114,7 @@ namespace DataTransferTool
             failures.BeginUpdate();
             failures.Items.Clear();
             foreach (var f in list.Take(1000))
-                failures.Items.Add(new ListViewItem(new[] { f.SourcePath + (f.IsDirectory ? "\\" : ""), FailureCsv.Reason(f.Category), $"{f.Message} (error {f.ErrorCode})" }));
+                failures.Items.Add(new ListViewItem(new[] { f.SourcePath + (f.IsDirectory ? "\\" : ""), FailureCsv.Reason(f.Category), $"{f.Message} (error {f.ErrorCode})" + (f.LogFile != null ? $"; log {f.LogFile}, line {f.LogLine}" : "") }));
             failures.EndUpdate();
 
             RunStep.WriteFailuresCsv(State);

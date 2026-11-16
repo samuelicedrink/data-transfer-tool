@@ -308,6 +308,19 @@ namespace DataTransfer.Core.Tests
             Assert.That(f.ErrorCode, Is.EqualTo(32));
             Assert.That(f.Size, Is.EqualTo(2222));
             Assert.That(f.Message, Does.Contain("being used by another process"));
+
+            // the failure points at its entry in the Robocopy log (v1.0.2): the last attempt, a retry log
+            string logFile = Path.Combine(root, "logs", f.LogFile);
+            Assert.That(f.LogFile, Does.Contain("_retry_"), "the latest log that tried this file");
+            Assert.That(File.Exists(logFile), "log file exists: " + f.LogFile);
+            string[] logLines = File.ReadAllText(logFile, System.Text.Encoding.Unicode).Split('\n');
+            string entry = logLines[f.LogLine - 1].TrimEnd('\r');
+            Assert.That(entry, Does.Contain(" ERROR 32 ").And.EndWith(locked), "line " + f.LogLine + " is the error entry");
+            string csv = Path.Combine(root, "t4", "failures.csv");
+            FailureCsv.Write(job, csv);
+            Assert.That(File.ReadAllLines(csv)[0], Does.EndWith("\"Log file\",\"Log line\""));
+            Assert.That(File.ReadAllLines(csv)[1], Does.EndWith($"\"{f.LogFile}\",\"{f.LogLine}\""));
+
             Assert.That(job.Totals().FilesCopied, Is.EqualTo(5));
             Assert.That(job.Totals().FilesFailed, Is.EqualTo(1));
             Assert.That(job.State, Is.EqualTo(JobState.Completed));
