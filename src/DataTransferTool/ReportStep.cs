@@ -16,6 +16,7 @@ namespace DataTransferTool
         readonly Label outcomeLabel = new Label { Name = "outcomeLabel", AutoSize = true, Font = Ui.BoldFont, Margin = new Padding(3, 2, 3, 8) };
         readonly ListView totals = new ListView { Name = "totalsList", Dock = DockStyle.Top, View = View.Details, FullRowSelect = true, HeaderStyle = ColumnHeaderStyle.Nonclickable, Height = 130 };
         readonly ListView failures = new ListView { Name = "failuresList", Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, HeaderStyle = ColumnHeaderStyle.Nonclickable };
+        readonly Label scoredForLabel = new Label { Name = "scoredForLabel", Dock = DockStyle.Top, AutoSize = true, ForeColor = Ui.Muted, Padding = new Padding(0, 4, 0, 0) };
         readonly Label failuresLabel = new Label { Name = "failuresLabel", Dock = DockStyle.Top, AutoSize = true, Font = Ui.BoldFont, Padding = new Padding(0, 10, 0, 4) };
         readonly Label csvLabel = new Label { Name = "csvLabel", AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(8, 8, 3, 3) };
         readonly Label activityLabel = new Label { Name = "reportActivityLabel", AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(8, 8, 3, 3) };
@@ -37,12 +38,14 @@ namespace DataTransferTool
             totals.Columns.Add("Skipped", 150);
             totals.Columns.Add("Failed", 120);
             totals.Columns.Add("Status", 160);
+            totals.Columns.Add("Relevant", 110);
             failures.Columns.Add("File or folder not copied", 470);
             failures.Columns.Add("Reason", 230);
             failures.Columns.Add("Details", 360);
 
             var top = new Panel { Dock = DockStyle.Top, AutoSize = true };
             outcomeLabel.Dock = DockStyle.Top;
+            top.Controls.Add(scoredForLabel);
             top.Controls.Add(totals);
             top.Controls.Add(outcomeLabel);
 
@@ -97,8 +100,10 @@ namespace DataTransferTool
             totals.BeginUpdate();
             totals.Items.Clear();
             foreach (var s in job.Sources)
-                totals.Items.Add(Row(s.Describe(), s.Totals, s.Failures.Count, StatusText(s.Status)));
-            var all = Row("Total" + (approx ? "  (approximate after an interruption)" : ""), t, job.AllFailures().Count(), "");
+                totals.Items.Add(Row(s.Describe(), s.Totals, s.Failures.Count, StatusText(s.Status),
+                    s.Relevance.HasValue ? s.Relevance + " %" + (s.RelevanceWeak ? " (weak)" : "") : ""));
+            scoredForLabel.Text = ScoredFor(job);
+            var all = Row("Total" + (approx ? "  (approximate after an interruption)" : ""), t, job.AllFailures().Count(), "", "");
             all.Font = Ui.BoldFont;
             totals.Items.Add(all);
             totals.EndUpdate();
@@ -121,9 +126,28 @@ namespace DataTransferTool
             RaiseButtonsChanged();
         }
 
-        static ListViewItem Row(string name, Counts c, int failed, string status) => new ListViewItem(new[]
+        /// <summary>Who the Relevant column was estimated for. The job keeps only the SID; the account name is looked up here and a SID is never shown.</summary>
+        static string lookedUpSid, lookedUpAccount;
+
+        static string ScoredFor(JobDefinition job)
         {
-            name, $"{c.FilesCopied:N0} ({Ui.Size(c.BytesCopied)})", $"{c.FilesSkipped:N0} ({Ui.Size(c.BytesSkipped)})", $"{failed:N0}", status
+            if (string.IsNullOrEmpty(job.SelectedUserSid)) return "No user was picked on the Select screen, so relevance was not estimated.";
+            // looked up once: a domain account can take seconds when the domain is not reachable
+            if (lookedUpSid != job.SelectedUserSid)
+            {
+                lookedUpSid = job.SelectedUserSid; lookedUpAccount = null;
+                try { lookedUpAccount = new SystemAccountSource().Translate(job.SelectedUserSid); } catch (Exception) { }
+            }
+            string account = lookedUpAccount;
+            string who = account ?? "a user whose account can no longer be looked up";
+            return job.Sources.Any(s => s.Relevance.HasValue)
+                ? $"Relevant: how likely each job's files are {who}'s, as estimated on the Select screen. An estimate, not a check."
+                : $"The user picked on the Select screen was {who}; the relevance numbers were not ready when the copy was set up.";
+        }
+
+        static ListViewItem Row(string name, Counts c, int failed, string status, string relevance) => new ListViewItem(new[]
+        {
+            name, $"{c.FilesCopied:N0} ({Ui.Size(c.BytesCopied)})", $"{c.FilesSkipped:N0} ({Ui.Size(c.BytesSkipped)})", $"{failed:N0}", status, relevance
         });
 
         static string StatusText(SourceStatus s) =>

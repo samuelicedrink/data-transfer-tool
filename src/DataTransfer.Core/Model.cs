@@ -113,6 +113,11 @@ namespace DataTransfer.Core
         /// <summary>v2: when not empty, the job copies only these file names directly in Path (no subfolders).</summary>
         [DataMember] public List<string> Files { get; set; } = new List<string>();
 
+        /// <summary>v2: relevance (0..100) of this job to the user picked on the Select step; null when not estimated.</summary>
+        [DataMember] public int? Relevance { get; set; }
+        /// <summary>v2: the estimate rests on weak facts (no owner recorded, or owned by Administrators).</summary>
+        [DataMember] public bool RelevanceWeak { get; set; }
+
         public bool FilesOnly => Files.Count > 0;
 
         /// <summary>Short description for lists: path and what is left out or picked.</summary>

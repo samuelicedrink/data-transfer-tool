@@ -313,6 +313,16 @@ namespace DataTransfer.Core
             return Math.Max(0, Math.Min(100, score));
         }
 
+        /// <summary>What is left of a folder's totals after taking out parts of it (unticked subfolders).</summary>
+        public static RelevanceGroup[] Subtract(IEnumerable<RelevanceGroup> all, IEnumerable<RelevanceGroup> minus)
+        {
+            var d = all.ToDictionary(g => g.Key);
+            foreach (var m in minus)
+                if (d.TryGetValue(m.Key, out var g))
+                    d[m.Key] = new RelevanceGroup { Key = g.Key, Bytes = Math.Max(0, g.Bytes - m.Bytes), Count = Math.Max(0, g.Count - m.Count) };
+            return d.Values.Where(g => g.Count > 0).ToArray();
+        }
+
         /// <summary>
         /// Score and Advice for a folder (size-weighted average of its groups; by count when all
         /// files are empty) or a single file (one group). Null when there is nothing to score.

@@ -156,6 +156,7 @@ namespace DataTransferTool
                 a.Path == b.Path && a.ExcludedSubfolders.SequenceEqual(b.ExcludedSubfolders) &&
                 a.ExcludedFiles.SequenceEqual(b.ExcludedFiles) && a.Files.SequenceEqual(b.Files)).All(x => x);
             if (!same) { State.Job.Sources = sources; State.Invalidate(); }
+            ScoreSources();
             return true;
         }
 
@@ -317,6 +318,30 @@ namespace DataTransferTool
             }
             else if (tn?.Tag is string) text = "Only the first " + MaxFilesShown.ToString("N0") + " files of a folder are listed; all of them are counted in its size and copied with it.";
             detailLabel.Text = text;
+        }
+
+        /// <summary>Keeps each job's relevance for the report. Jobs whose numbers are not ready stay without one.</summary>
+        void ScoreSources()
+        {
+            foreach (var s in State.Job.Sources)
+            {
+                s.Relevance = null; s.RelevanceWeak = false;
+                if (target == null) continue;
+                RelevanceGroup[] groups = null;
+                if (s.FilesOnly)
+                {
+                    var wanted = new System.Collections.Generic.HashSet<string>(s.Files, StringComparer.OrdinalIgnoreCase);
+                    groups = FolderScanner.ListFiles(s.Path, int.MaxValue, classifier).Files.Where(f => wanted.Contains(f.Name)).SelectMany(f => f.AsGroups()).ToArray();
+                }
+                else if (scanner.TryGet(s.Path, out var sum) && sum.Groups != null)
+                {
+                    groups = sum.Groups;
+                    foreach (var x in s.ExcludedSubfolders)
+                        if (scanner.TryGet(x, out var part) && part.Groups != null) groups = RelevanceClassifier.Subtract(groups, part.Groups);
+                }
+                var r = classifier.Evaluate(groups, target);
+                if (r != null) { s.Relevance = r.Score; s.RelevanceWeak = r.Weak; }
+            }
         }
 
         string RelevanceLine(TreeNode tn)
