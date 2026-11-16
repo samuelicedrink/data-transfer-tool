@@ -72,6 +72,9 @@ namespace DataTransfer.Core
                     foreach (var x in source.ExcludedSubfolders) excludedPaths.Add(x.TrimEnd('\\'));
                     foreach (var x in RobocopyCommandBuilder.ProfileExclusions(source.Path, job.Options.ExcludeProfileDirs, profiles)) excludedPaths.Add(x.TrimEnd('\\'));
                     if (!string.IsNullOrEmpty(job.DestinationRoot) && PathUtil.IsSameOrUnder(job.DestinationRoot, source.Path)) excludedPaths.Add(job.DestinationRoot.TrimEnd('\\'));
+                    // v2: unticked files (/XF full paths) and files-only jobs (named files, no subfolders)
+                    var excludedFiles = new HashSet<string>(source.ExcludedFiles, StringComparer.OrdinalIgnoreCase);
+                    var onlyFiles = source.FilesOnly ? new HashSet<string>(source.Files, StringComparer.OrdinalIgnoreCase) : null;
 
                     var stack = new Stack<string>();
                     stack.Push(PathUtil.Trim(source.Path));
@@ -88,13 +91,14 @@ namespace DataTransfer.Core
                             {
                                 // /XJ: junctions and directory symlinks are not followed
                                 if ((attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0 && (tag == IO_REPARSE_TAG_MOUNT_POINT || tag == IO_REPARSE_TAG_SYMLINK)) return;
-                                if (excludedPaths.Contains(full) || dirPatterns.Any(p => p.IsMatch(name))) return;
+                                if (onlyFiles != null || excludedPaths.Contains(full) || dirPatterns.Any(p => p.IsMatch(name))) return;
                                 stack.Push(full);
                                 return;
                             }
+                            if (onlyFiles != null && !onlyFiles.Contains(name)) return; // not part of this job at all
                             result.Files++; result.Bytes += size;
                             if (full.Length > result.LongestPath) result.LongestPath = full.Length;
-                            bool nameExcluded = filePatterns.Any(p => p.IsMatch(name)) ||
+                            bool nameExcluded = filePatterns.Any(p => p.IsMatch(name)) || excludedFiles.Contains(full) ||
                                                 ((attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0 && tag == IO_REPARSE_TAG_SYMLINK);
                             if (nameExcluded) { result.NameExcludedFiles++; return; }
                             if (IsCloudOnly(attrs))

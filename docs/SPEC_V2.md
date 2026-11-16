@@ -39,8 +39,9 @@ its score.
   technician opens are scanned first; the screen never freezes.
 - WinForms has no tree with columns, so the list is a tree-grid: the native tree view with the
   names and columns drawn by the tool (keyboard use, tick boxes and UI Automation as in v1).
-- Files follow their folder (greyed box): they are copied or left out with it. Whether files
-  get tick boxes of their own is an open question for the owner (DECISIONS.md, V2-M2).
+- Files have tick boxes of their own (owner, 2026-11-15). An unticked file in a ticked folder
+  is left out (`/XF` with its full path); files ticked in an unticked folder are copied by a job
+  of their own that takes only those files. A default exclusion (`~$*` …) still applies.
 - A folder lists its first 1,000 files by name; a line counts the rest. All are in its size.
 - Cloud-only OneDrive files are counted but marked, as in v1 (they are not copied).
 

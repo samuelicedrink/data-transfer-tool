@@ -30,6 +30,7 @@ namespace DataTransfer.Core
         /// <summary>Same as Build but for a subfolder of a source (used to retry a failed folder).</summary>
         public static string BuildTree(JobDefinition job, SourceSelection source, string folder, string logPath, bool listOnly, ProfileInfo profiles)
         {
+            if (source.FilesOnly) return BuildFiles(job, source, logPath, listOnly);
             var o = job.Options;
             var sb = new StringBuilder();
             sb.Append(Quote(folder)).Append(' ').Append(Quote(job.DestinationFor(folder))).Append(' ');
@@ -46,11 +47,30 @@ namespace DataTransfer.Core
             if (xd.Count > 0) sb.Append(" /XD ").Append(string.Join(" ", xd.Select(Quote)));
 
             var xf = o.ExcludeFiles.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+            // v2: unticked files, as full paths (Robocopy then leaves out only that file, not every file of that name)
+            xf.AddRange(source.ExcludedFiles.Where(x => PathUtil.IsSameOrUnder(x, folder)));
             if (xf.Count > 0) sb.Append(" /XF ").Append(string.Join(" ", xf.Select(Quote)));
 
             sb.Append(" /UNILOG:").Append(Quote(logPath));
             if (sb.Length > MaxArgumentLength)
-                throw new InvalidOperationException($"Too many exclusions for one Robocopy command ({sb.Length} characters). Untick fewer subfolders under {folder}.");
+                throw new InvalidOperationException($"Too many exclusions for one Robocopy command ({sb.Length} characters). Untick fewer subfolders or files under {folder}, or untick the folder.");
+            return sb.ToString();
+        }
+
+        /// <summary>v2: a job that copies only some files directly in a folder (no subfolders).</summary>
+        static string BuildFiles(JobDefinition job, SourceSelection source, string logPath, bool listOnly)
+        {
+            var o = job.Options;
+            var sb = new StringBuilder();
+            sb.Append(Quote(source.Path)).Append(' ').Append(Quote(job.DestinationFor(source.Path)));
+            foreach (var n in source.Files) sb.Append(' ').Append(Quote(n));
+            sb.Append(' ').Append(BaseFlags(o, recurse: false));
+            if (listOnly) sb.Append(" /L");
+            var xf = o.ExcludeFiles.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+            if (xf.Count > 0) sb.Append(" /XF ").Append(string.Join(" ", xf.Select(Quote)));
+            sb.Append(" /UNILOG:").Append(Quote(logPath));
+            if (sb.Length > MaxArgumentLength)
+                throw new InvalidOperationException($"Too many single files ticked in {source.Path} for one Robocopy command ({sb.Length} characters). Tick the folder instead and untick the files to leave out.");
             return sb.ToString();
         }
 

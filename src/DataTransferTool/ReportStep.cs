@@ -97,7 +97,7 @@ namespace DataTransferTool
             totals.BeginUpdate();
             totals.Items.Clear();
             foreach (var s in job.Sources)
-                totals.Items.Add(Row(s.Path, s.Totals, s.Failures.Count, StatusText(s.Status)));
+                totals.Items.Add(Row(s.Describe(), s.Totals, s.Failures.Count, StatusText(s.Status)));
             var all = Row("Total" + (approx ? "  (approximate after an interruption)" : ""), t, job.AllFailures().Count(), "");
             all.Font = Ui.BoldFont;
             totals.Items.Add(all);

@@ -117,7 +117,7 @@ namespace DataTransferTool
         }
 
         public override string Title => "Select folders";
-        public override string Subtitle => "Tick the folders to copy. Unticked subfolders are left out. Click a box or press Space.";
+        public override string Subtitle => "Tick the folders and files to copy. Unticked subfolders and files are left out. Click a box or press Space.";
         public override bool CanGoNext => sourceCount > 0;
 
         public override void OnEnter()
@@ -141,7 +141,8 @@ namespace DataTransferTool
             var sources = State.Tree.ToSources();
             if (sources.Count == 0) return false;
             bool same = sources.Count == State.Job.Sources.Count && sources.Zip(State.Job.Sources, (a, b) =>
-                a.Path == b.Path && a.ExcludedSubfolders.SequenceEqual(b.ExcludedSubfolders)).All(x => x);
+                a.Path == b.Path && a.ExcludedSubfolders.SequenceEqual(b.ExcludedSubfolders) &&
+                a.ExcludedFiles.SequenceEqual(b.ExcludedFiles) && a.Files.SequenceEqual(b.Files)).All(x => x);
             if (!same) { State.Job.Sources = sources; State.Invalidate(); }
             return true;
         }
@@ -180,7 +181,12 @@ namespace DataTransferTool
 
         void Toggle(TreeNode tn)
         {
-            if (tn.Tag is FileItem) { Message("Files are copied or left out with their folder: tick or untick the folder.", false); return; }
+            if (tn.Tag is FileItem file && tn.Parent?.Tag is FolderNode folder)
+            {
+                State.Tree.ToggleFile(folder, file.Name);
+                Refresh(null);
+                return;
+            }
             if (!(tn.Tag is FolderNode n)) return;
             State.Tree.Toggle(n);
             Refresh(null);
@@ -190,10 +196,9 @@ namespace DataTransferTool
         {
             foreach (TreeNode tn in nodes)
             {
-                if (tn.Tag is FileItem)
+                if (tn.Tag is FileItem file)
                 {
-                    // a folder's own files are copied when the folder itself is ticked
-                    int fi = tn.Parent?.Tag is FolderNode p && p.Included ? 4 : 3;
+                    int fi = tn.Parent?.Tag is FolderNode p && State.Tree.IsFileIncluded(p, file.Name) ? 1 : 0;
                     if (tn.StateImageIndex != fi) tn.StateImageIndex = fi;
                     continue;
                 }
@@ -222,6 +227,11 @@ namespace DataTransferTool
             return column == 0 ? Date(s.NewestUtc) : GridSize(s.Bytes) + (s.UnreadableFolders > 0 ? "+" : "");
         }
 
+        static bool Matches(string pattern, string name) =>
+            !string.IsNullOrWhiteSpace(pattern) && System.Text.RegularExpressions.Regex.IsMatch(name,
+                "^" + System.Text.RegularExpressions.Regex.Escape(pattern.Trim()).Replace(@"\*", ".*").Replace(@"\?", ".") + "$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
         static string Date(DateTime? utc) => utc.HasValue ? utc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "";
 
         static string GridSize(long bytes) => bytes < 1024 ? bytes + " B" : Ui.Size(bytes);
@@ -249,7 +259,9 @@ namespace DataTransferTool
             {
                 text = $"{f.Path}: {Ui.Size(f.Size)}, modified {Date(f.ModifiedUtc)}." +
                        (f.CloudOnly ? " Cloud-only (OneDrive keeps it online): counted, but not copied." : "") +
-                       " Files are copied or left out with their folder.";
+                       (tn.Parent?.Tag is FolderNode p && !p.Included && State.Tree.IsFileIncluded(p, f.Name) ? " Ticked on its own: copied without the rest of its folder." : "");
+                string rule = State.Job.Options.ExcludeFiles.FirstOrDefault(x => Matches(x, f.Name));
+                if (rule != null) text += $" Not copied even when ticked: it matches the exclusion \"{rule}\" (Options).";
             }
             else if (tn?.Tag is FolderNode n)
             {
@@ -327,11 +339,12 @@ namespace DataTransferTool
             selectionList.BeginUpdate();
             selectionList.Items.Clear();
             foreach (var s in sources)
-                selectionList.Items.Add(s.ExcludedSubfolders.Count == 0 ? s.Path : $"{s.Path}   (without {s.ExcludedSubfolders.Count} subfolder{(s.ExcludedSubfolders.Count == 1 ? "" : "s")})");
+                selectionList.Items.Add(s.Describe());
             selectionList.EndUpdate();
             summaryLabel.Text = sources.Count == 0 ? "Nothing ticked yet." :
                 $"{sources.Count} folder job(s). Skipped everywhere: {string.Join(", ", State.Job.Options.ExcludeFiles)}; and {string.Join(", ", State.Job.Options.ExcludeProfileDirs)} in each profile.";
             if (message != null) Message(message, false);
+            ShowDetail();
             RaiseButtonsChanged();
         }
 

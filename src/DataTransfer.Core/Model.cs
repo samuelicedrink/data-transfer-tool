@@ -98,13 +98,32 @@ namespace DataTransfer.Core
         public override string ToString() => $"{Category} ({ErrorCode}) {SourcePath}: {Message}";
     }
 
-    /// <summary>One ticked top-level folder = one Robocopy job.</summary>
+    /// <summary>
+    /// One Robocopy job: a ticked top-level folder (with everything below it), or, when
+    /// <see cref="Files"/> is not empty, only some files directly in a folder that is not ticked.
+    /// </summary>
     [DataContract]
     public sealed class SourceSelection
     {
         [DataMember] public string Path { get; set; }
         /// <summary>Full paths of unticked subfolders; each becomes /XD.</summary>
         [DataMember] public List<string> ExcludedSubfolders { get; set; } = new List<string>();
+        /// <summary>v2: full paths of unticked files inside the folder; each becomes /XF.</summary>
+        [DataMember] public List<string> ExcludedFiles { get; set; } = new List<string>();
+        /// <summary>v2: when not empty, the job copies only these file names directly in Path (no subfolders).</summary>
+        [DataMember] public List<string> Files { get; set; } = new List<string>();
+
+        public bool FilesOnly => Files.Count > 0;
+
+        /// <summary>Short description for lists: path and what is left out or picked.</summary>
+        public string Describe()
+        {
+            if (FilesOnly) return $"{Path}   ({Files.Count} file{(Files.Count == 1 ? "" : "s")} only)";
+            var parts = new List<string>();
+            if (ExcludedSubfolders.Count > 0) parts.Add($"{ExcludedSubfolders.Count} subfolder{(ExcludedSubfolders.Count == 1 ? "" : "s")}");
+            if (ExcludedFiles.Count > 0) parts.Add($"{ExcludedFiles.Count} file{(ExcludedFiles.Count == 1 ? "" : "s")}");
+            return parts.Count == 0 ? Path : $"{Path}   (without {string.Join(" and ", parts)})";
+        }
         [DataMember] public SourceStatus Status { get; set; }
         [DataMember] public int LastExitCode { get; set; }
         [DataMember] public Counts Totals { get; set; } = new Counts();
@@ -116,6 +135,8 @@ namespace DataTransfer.Core
         void Fix(StreamingContext c)
         {
             ExcludedSubfolders = ExcludedSubfolders ?? new List<string>();
+            ExcludedFiles = ExcludedFiles ?? new List<string>();
+            Files = Files ?? new List<string>();
             Totals = Totals ?? new Counts();
             Failures = Failures ?? new List<FileFailure>();
         }

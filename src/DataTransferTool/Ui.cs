@@ -73,17 +73,13 @@ namespace DataTransferTool
 
         public static TextBox TextBox(string name, int width) => new TextBox { Name = name, Width = width, Margin = new Padding(3, 4, 3, 3) };
 
-        /// <summary>
-        /// Check box images for the folder tree, in the system style: 0 unchecked, 1 checked,
-        /// 2 mixed; 3 and 4 greyed unchecked and checked (files, which follow their folder).
-        /// </summary>
+        /// <summary>Unchecked, checked and mixed check box images for the folder tree, in the system style.</summary>
         public static ImageList CheckImages(Control owner)
         {
             int size;
             using (var g = owner.CreateGraphics()) size = Math.Max(16, (int)Math.Round(16 * g.DpiX / 96f));
             var list = new ImageList { ImageSize = new Size(size, size), ColorDepth = ColorDepth.Depth32Bit };
-            foreach (var state in new[] { CheckBoxState.UncheckedNormal, CheckBoxState.CheckedNormal, CheckBoxState.MixedNormal,
-                                          CheckBoxState.UncheckedDisabled, CheckBoxState.CheckedDisabled })
+            foreach (var state in new[] { CheckBoxState.UncheckedNormal, CheckBoxState.CheckedNormal, CheckBoxState.MixedNormal })
             {
                 var bmp = new Bitmap(size, size);
                 using (var g = Graphics.FromImage(bmp))

@@ -414,13 +414,31 @@ static class Program
         Check(WaitFor(() => Text("detailLabel").StartsWith(first.FullName + ": ") && Text("detailLabel").Contains("modified " + first.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), 10),
               "file line shows size and modified date: " + First(Text("detailLabel")));
 
-        // a file has no tick box of its own
-        int jobs = Items("selectionList").Count;
+        // files have tick boxes of their own (owner, 2026-11-15)
         PressSpace(tree);
-        Check(WaitFor(() => Text("messageLabel").StartsWith("Files are copied or left out with their folder"), 5), "Space on a file explains that files follow their folder");
-        Check(Items("selectionList").Count == jobs && Items("selectionList").Contains(small), "selection unchanged");
+        Check(WaitFor(() => Items("selectionList").Contains(small + "   (without 1 file)"), 5), "Space unticks one file: " + string.Join(" | ", Items("selectionList")));
+        PressSpace(tree);
+        Check(WaitFor(() => Items("selectionList").SequenceEqual(new[] { small }), 5), "Space ticks it again");
 
+        // a single file in an unticked folder becomes a job of its own
         var sub = TreeItem(docs, "Sub");
+        ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Thread.Sleep(300);
+        PressSpace(tree);
+        Expand(sub);
+        string subDir = Path.Combine(small, "Docs", "Sub");
+        var subFile = new DirectoryInfo(subDir).GetFiles().OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).First();
+        ((SelectionItemPattern)TreeItem(sub, subFile.Name).GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Thread.Sleep(300);
+        PressSpace(tree);
+        Check(WaitFor(() => Items("selectionList").Contains(subDir + "   (1 file only)") && Items("selectionList").Contains(small + "   (without 1 subfolder)"), 5),
+              "unticked folder with one ticked file: " + string.Join(" | ", Items("selectionList")));
+        Check(Text("detailLabel").Contains("Ticked on its own"), "the file line says the file is ticked on its own");
+        Shot("h-file-ticks");
+        Invoke(Id("clearButton"));
+        TickFolder(small);
+
+        ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
         ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
         Check(WaitFor(() => Text("detailLabel").StartsWith(Path.Combine(small, "Docs", "Sub") + ": "), 10), "subfolder numbers are ready at once (kept from the parent's scan)");
         Shot("h-tree-grid");
