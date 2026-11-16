@@ -17,6 +17,8 @@ namespace DataTransfer.Core
         public DateTime? NewestUtc;
         /// <summary>Folders inside (this one included) that could not be listed: the totals are a minimum.</summary>
         public int UnreadableFolders;
+        /// <summary>v2 relevance: files inside, added up by the facts the score depends on. Null without a classifier.</summary>
+        public RelevanceGroup[] Groups;
     }
 
     /// <summary>One file directly in a folder.</summary>
@@ -26,6 +28,9 @@ namespace DataTransfer.Core
         public long Size;
         public DateTime? ModifiedUtc;
         public bool CloudOnly;
+        /// <summary>v2 relevance group key; 0 when listed without a classifier.</summary>
+        public long Key;
+        public RelevanceGroup[] AsGroups() => new[] { new RelevanceGroup { Key = Key, Bytes = Size, Count = 1 } };
         public override string ToString() => Path;
     }
 
@@ -59,9 +64,13 @@ namespace DataTransfer.Core
         IntPtr buffer;
 
         /// <param name="useBackupPrivilege">Enable SeBackupPrivilege when held (elevated), to read folders as Robocopy /B does.</param>
-        public FolderScanner(bool useBackupPrivilege = true)
+        readonly RelevanceClassifier classifier;
+
+        /// <param name="classifier">v2: when given, each file's owner and kind are read for the relevance score.</param>
+        public FolderScanner(bool useBackupPrivilege = true, RelevanceClassifier classifier = null)
         {
             backupPrivilege = useBackupPrivilege;
+            this.classifier = classifier;
             // deep trees and nested interruptions recurse; give the thread room
             worker = new Thread(Run, 16 * 1024 * 1024) { IsBackground = true, Name = "FolderScanner", Priority = ThreadPriority.BelowNormal };
             worker.Start();
@@ -150,6 +159,8 @@ namespace DataTransfer.Core
             if (done.TryGetValue(dir, out var cached)) return cached;
             var s = new FolderSummary();
             var subfolders = new List<string>();
+            var facts = classifier?.ForFolder(dir);
+            var groups = classifier == null ? null : new Dictionary<long, RelevanceGroup>();
             SourceWalker.Enumerate(dir, buffer, err => s.UnreadableFolders++, (name, attrs, size, tag, written) =>
             {
                 string full = dir.EndsWith("\\") ? dir + name : dir + "\\" + name;
@@ -162,6 +173,7 @@ namespace DataTransfer.Core
                 }
                 if ((attrs & SourceWalker.FILE_ATTRIBUTE_REPARSE_POINT) != 0 && tag == SourceWalker.IO_REPARSE_TAG_SYMLINK) return;
                 Add(s, size, written, SourceWalker.IsCloudOnly(attrs));
+                if (groups != null) AddGroup(groups, classifier.KeyFor(facts, full, name), size, 1);
             });
 
             walking.Add(dir);
@@ -176,12 +188,20 @@ namespace DataTransfer.Core
                     s.Files += c.Files; s.Bytes += c.Bytes;
                     s.CloudFiles += c.CloudFiles; s.CloudBytes += c.CloudBytes;
                     s.UnreadableFolders += c.UnreadableFolders;
+                    if (groups != null && c.Groups != null) foreach (var g in c.Groups) AddGroup(groups, g.Key, g.Bytes, g.Count);
                     if (c.NewestUtc.HasValue && (!s.NewestUtc.HasValue || c.NewestUtc > s.NewestUtc)) s.NewestUtc = c.NewestUtc;
                 }
             }
             finally { walking.RemoveAt(walking.Count - 1); }
+            if (groups != null) s.Groups = groups.Values.ToArray();
             done[dir] = s;
             return s;
+        }
+
+        static void AddGroup(Dictionary<long, RelevanceGroup> groups, long key, long bytes, long count)
+        {
+            groups.TryGetValue(key, out var g);
+            groups[key] = new RelevanceGroup { Key = key, Bytes = g.Bytes + bytes, Count = g.Count + count };
         }
 
         static void Add(FolderSummary s, long size, long written, bool cloud)
@@ -202,7 +222,7 @@ namespace DataTransfer.Core
         /// The files directly in a folder, sorted by name, at most <paramref name="max"/> of them.
         /// File symbolic links are left out (Robocopy does not copy them with /XJ).
         /// </summary>
-        public static FileListing ListFiles(string folder, int max)
+        public static FileListing ListFiles(string folder, int max, RelevanceClassifier classifier = null)
         {
             var result = new FileListing();
             var all = new List<FileItem>();
@@ -224,6 +244,11 @@ namespace DataTransfer.Core
             finally { Marshal.FreeHGlobal(buf); }
             result.TotalFiles = all.Count;
             result.Files = all.OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).Take(max).ToList();
+            if (classifier != null)
+            {
+                var facts = classifier.ForFolder(dir);
+                foreach (var f in result.Files) f.Key = classifier.KeyFor(facts, f.Path, f.Name);
+            }
             return result;
         }
     }
