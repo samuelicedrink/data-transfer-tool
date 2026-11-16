@@ -33,22 +33,14 @@ static class Program
         if (a.Length < 6) { Console.WriteLine("usage: DttUiSmoke <exe> <shots> <work> <small source> <large source> <many-files source>"); return 2; }
         exe = Path.GetFullPath(a[0]); shots = a[1]; work = a[2]; small = a[3]; large = a[4]; many = a[5];
         Directory.CreateDirectory(shots);
-        // DTT_SMOKE_QUIET=1: the tool runs on the second screen without taking the focus (SmokeTest
-        // build), and this watcher checks that it never does, so the PC can be used meanwhile
-        bool quiet = Environment.GetEnvironmentVariable("DTT_SMOKE_QUIET") == "1";
-        int focusTaken = 0;
-        var watching = new CancellationTokenSource();
-        if (quiet)
-            new Thread(() =>
-            {
-                while (!watching.IsCancellationRequested)
-                {
-                    var p = proc;
-                    GetWindowThreadProcessId(GetForegroundWindow(), out uint pid);
-                    if (p != null && pid == (uint)p.Id) Interlocked.Increment(ref focusTaken);
-                    Thread.Sleep(100);
-                }
-            }) { IsBackground = true }.Start();
+        // DTT_SMOKE_QUIET=1: the whole test runs on a separate, invisible Windows desktop, so it can
+        // never take the keyboard or mouse from the person using the PC. (Running it on a second
+        // screen was not enough: the tool still came to the front, owner 2026-11-16.)
+        if (Environment.GetEnvironmentVariable("DTT_SMOKE_QUIET") == "1" && Environment.GetEnvironmentVariable("DTT_SMOKE_CHILD") != "1")
+            return RunOnOwnDesktop(a);
+        // on the other desktop there is no console to see: write the output to a file the starter relays
+        string outPath = Environment.GetEnvironmentVariable("DTT_SMOKE_OUT");
+        if (!string.IsNullOrEmpty(outPath)) Console.SetOut(new StreamWriter(new FileStream(outPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), new System.Text.UTF8Encoding(false)) { AutoFlush = true });
         try
         {
             string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEF"; // D resumes the job C leaves behind
@@ -61,10 +53,84 @@ static class Program
         }
         catch (Exception ex) { Fail("crashed: " + ex); Shot("error"); }
         finally { try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { } }
-        watching.Cancel();
-        if (quiet) Check(focusTaken == 0, $"the tool never took the focus from the person using the PC ({focusTaken} check(s) found it in front)");
         Console.WriteLine(fails == 0 ? "ALL PASSED" : $"{fails} FAILURE(S)");
+        Console.Out.Flush();
         return fails == 0 ? 0 : 1;
+    }
+
+    // ------------------------------------------------------------ own desktop
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct STARTUPINFO
+    {
+        public int cb; public string lpReserved, lpDesktop, lpTitle;
+        public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+        public short wShowWindow, cbReserved2; public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
+    }
+    [StructLayout(LayoutKind.Sequential)] struct PROCESS_INFORMATION { public IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr CreateDesktop(string name, IntPtr device, IntPtr devmode, int flags, uint access, IntPtr sa);
+    [DllImport("user32.dll", SetLastError = true)] static extern bool CloseDesktop(IntPtr desktop);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern bool CreateProcess(string app, System.Text.StringBuilder cmd, IntPtr pa, IntPtr ta, bool inherit, int flags, IntPtr env, string dir, ref STARTUPINFO si, out PROCESS_INFORMATION pi);
+    [DllImport("kernel32.dll")] static extern uint WaitForSingleObject(IntPtr h, uint ms);
+    [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr h, out uint code);
+    [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+
+    /// <summary>
+    /// Starts this test again on a new desktop and passes its output through. Windows there get
+    /// no keyboard or mouse input from the real desktop and are never shown on it. Meanwhile a
+    /// watcher checks that no window of the tool ever comes to the front on the real desktop.
+    /// </summary>
+    static int RunOnOwnDesktop(string[] a)
+    {
+        string name = "DttSmoke_" + Process.GetCurrentProcess().Id;
+        IntPtr desk = CreateDesktop(name, IntPtr.Zero, IntPtr.Zero, 0, 0x10000000 /* GENERIC_ALL */, IntPtr.Zero);
+        if (desk == IntPtr.Zero) { Console.WriteLine("could not create a desktop: " + Marshal.GetLastWin32Error()); return 2; }
+        string outFile = Path.Combine(shots, "smoke_output.txt");
+        File.Delete(outFile);
+        Environment.SetEnvironmentVariable("DTT_SMOKE_CHILD", "1");
+        Environment.SetEnvironmentVariable("DTT_SMOKE_OUT", outFile);
+        var cmd = new System.Text.StringBuilder("\"" + Process.GetCurrentProcess().MainModule.FileName + "\" " + string.Join(" ", a.Select(x => "\"" + x.TrimEnd('\\') + "\"")));
+        var si = new STARTUPINFO { cb = Marshal.SizeOf(typeof(STARTUPINFO)), lpDesktop = "WinSta0\\" + name };
+        if (!CreateProcess(null, cmd, IntPtr.Zero, IntPtr.Zero, false, 0x08000000 /* CREATE_NO_WINDOW */, IntPtr.Zero, Environment.CurrentDirectory, ref si, out var pi))
+        { Console.WriteLine("could not start the test on its desktop: " + Marshal.GetLastWin32Error()); CloseDesktop(desk); return 2; }
+        Console.WriteLine($"(running on its own desktop \"{name}\"; your keyboard, mouse and screens are not used)");
+
+        int inFront = 0;
+        long shown = 0;
+        while (WaitForSingleObject(pi.hProcess, 200) != 0)
+        {
+            GetWindowThreadProcessId(GetForegroundWindow(), out uint pid);
+            try { if (pid != 0 && Process.GetProcessById((int)pid).ProcessName.Equals(Path.GetFileNameWithoutExtension(exe), StringComparison.OrdinalIgnoreCase)) inFront++; } catch (ArgumentException) { }
+            shown = Relay(outFile, shown);
+        }
+        Relay(outFile, shown);
+        GetExitCodeProcess(pi.hProcess, out uint code);
+        CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+        CloseDesktop(desk);
+        bool ok = inFront == 0;
+        Console.WriteLine(ok ? "  PASS the tool never came to the front on your desktop" : $"  FAIL the tool came to the front on your desktop ({inFront} check(s))");
+        return ok ? (int)code : 1;
+    }
+
+    /// <summary>Prints what the test on the other desktop has written since the last call.</summary>
+    static long Relay(string file, long from)
+    {
+        try
+        {
+            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            {
+                if (fs.Length <= from) return from;
+                fs.Seek(from, SeekOrigin.Begin);
+                var r = new StreamReader(fs, System.Text.Encoding.UTF8, false);
+                Console.Write(r.ReadToEnd());
+                return fs.Length;
+            }
+        }
+        catch (IOException) { return from; }
     }
 
     // ------------------------------------------------------------ scenarios
@@ -128,7 +194,7 @@ static class Program
         string status = Text("statusLabel");
         Console.WriteLine("   status: " + status + " | files: " + Text("filesLabel"));
         Check(status == "Finished: everything was copied.", "outcome shown");
-        Check(NoOtherWindows(), "no dialog appeared during the run");
+        Check(NoOtherWindows(), "no dialog appeared during the run" + (NoOtherWindows() ? "" : ": " + string.Join("; ", OtherWindows())));
 
         VerifyCopy(dest);
         string jobFile = Path.Combine(Path.GetDirectoryName(exe), "DataTransferJob.json");
@@ -192,7 +258,7 @@ static class Program
         Shot("8-cancelled");
         Check(Text("statusLabel").StartsWith("Cancelled."), "status: " + Text("statusLabel"));
         Check(Process.GetProcessesByName("robocopy").Length == 0, "no Robocopy left running");
-        Check(NoOtherWindows(), "no dialog appeared");
+        Check(NoOtherWindows(), "no dialog appeared" + (NoOtherWindows() ? "" : ": " + string.Join("; ", OtherWindows())));
 
         Next();
         Check(Text("outcomeLabel").StartsWith("The copy was cancelled."), "report says cancelled");
@@ -469,10 +535,10 @@ static class Program
         Check(dlg != null, "Options dialog opens");
         if (dlg == null) return;
         var backup = Id("backupCheck", dlg);
-        var toggle = (TogglePattern)backup.GetCurrentPattern(TogglePattern.Pattern);
-        Check(toggle.Current.ToggleState == ToggleState.On, "backup mode (/B) is on by default");
+        Check(ToggleStateOf(backup) == ToggleState.On, "backup mode (/B) is on by default");
         // the smoke test is not elevated, and /B needs elevation
-        toggle.Toggle();
+        Invoke(backup);
+        Check(WaitFor(() => ToggleStateOf(backup) == ToggleState.Off, 5), "backup mode switched off");
         Check(Value(Id("excludeFilesBox", dlg)).Replace("\r\n", ",") == "desktop.ini,thumbs.db,~$*,*.tmp", "default file exclusions are listed and editable");
         Check(Value(Id("knownAppsBox", dlg)).Contains("WINWORD"), "known applications list is editable");
         if (screenshot) Shot("4-options", dlg);
@@ -580,8 +646,32 @@ static class Program
     static string Value(AutomationElement e) =>
         e.TryGetCurrentPattern(ValuePattern.Pattern, out object v) ? ((ValuePattern)v).Current.Value
         : ((TextPattern)e.GetCurrentPattern(TextPattern.Pattern)).DocumentRange.GetText(-1).TrimEnd('\r', '\n'); // multi-line boxes
-    static void SetValue(AutomationElement e, string v) => ((ValuePattern)e.GetCurrentPattern(ValuePattern.Pattern)).SetValue(v);
-    static void Invoke(AutomationElement e) => ((InvokePattern)e.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+    // UI Automation's own Invoke, SetValue and Toggle first move the focus to the control with a
+    // simulated key press (SendInput). That brought the tool to the front and took the keyboard of
+    // the person using the PC (owner, 2026-11-16), and it fails on a desktop of its own. These
+    // helpers send the window messages directly instead, so no input and no focus are needed.
+
+    /// <summary>Text of an edit box, set with WM_SETTEXT (the box reports the change as typed text would).</summary>
+    static void SetValue(AutomationElement e, string v)
+    {
+        var h = new IntPtr(e.Current.NativeWindowHandle);
+        if (h == IntPtr.Zero) { ((ValuePattern)e.GetCurrentPattern(ValuePattern.Pattern)).SetValue(v); return; }
+        SendMessage(h, 0x000C /* WM_SETTEXT */, IntPtr.Zero, new System.Text.StringBuilder(v));
+    }
+
+    /// <summary>
+    /// Presses a button or check box with BM_CLICK, then waits until the window has handled it
+    /// (a button that opens a modal dialog returns once the dialog is up).
+    /// </summary>
+    static void Invoke(AutomationElement e)
+    {
+        var h = new IntPtr(e.Current.NativeWindowHandle);
+        if (h == IntPtr.Zero) { ((InvokePattern)e.GetCurrentPattern(InvokePattern.Pattern)).Invoke(); return; }
+        PostMessage(h, 0x00F5 /* BM_CLICK */, IntPtr.Zero, IntPtr.Zero);
+        SendMessageTimeout(h, 0x0000 /* WM_NULL */, IntPtr.Zero, IntPtr.Zero, 0x0002 /* SMTO_ABORTIFHUNG */, 30000, out _);
+    }
+
+    static ToggleState ToggleStateOf(AutomationElement e) => ((TogglePattern)e.GetCurrentPattern(TogglePattern.Pattern)).Current.ToggleState;
 
     static void Expand(AutomationElement e)
     {
@@ -619,9 +709,18 @@ static class Program
 
     static List<string[]> Rows() => ListItems().Select(RowOf).ToList();
 
-    static bool NoOtherWindows() =>
-        AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, proc.Id)).Count <= 1 &&
-        win.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window)).Count == 0;
+    /// <summary>No window of the tool besides the main one (no dialog, no message box). Names any it finds.</summary>
+    static bool NoOtherWindows() => OtherWindows().Count == 0;
+
+    static List<string> OtherWindows()
+    {
+        var found = new List<string>();
+        foreach (AutomationElement e in AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, proc.Id)))
+            if (e.Current.NativeWindowHandle != win.Current.NativeWindowHandle) found.Add($"top-level \"{e.Current.Name}\" ({e.Current.ClassName}, {e.Current.ControlType.ProgrammaticName})");
+        foreach (AutomationElement e in win.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window)))
+            found.Add($"owned \"{e.Current.Name}\" ({e.Current.ClassName})");
+        return found;
+    }
 
     static bool WaitFor(Func<bool> cond, double seconds)
     {
@@ -637,11 +736,10 @@ static class Program
     // The test never brings the tool to the front and never sends keystrokes through the desktop,
     // so it cannot type into, or cover, whatever the person at the PC is using.
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
-    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT r);
     [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, System.Text.StringBuilder l);
     [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
 
     /// <summary>BM_CLICK straight to the button's window.</summary>
