@@ -8,6 +8,12 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — Owner approved V2-M1
+
+- V2-M1 (user picker) merged into `main` and tagged `v2-m1`. V2-M2 (tree-grid with
+  Modified and Size) starts on branch `v2-m2-tree-grid`.
+- Who: owner ("go").
+
 ## 2026-11-15 — V2-M1 design choices (reviewed by the owner)
 
 - **Tests do not create Windows accounts.** The v2 spec said the unit tests would create
