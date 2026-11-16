@@ -8,7 +8,14 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
-## 2026-11-15 — V2-M3 relevance design choices (to be reviewed by the owner)
+## 2026-11-15 — Owner approved V2-M3
+
+- V2-M3 merged into `main` and tagged `v2-m3`. V2-M4 starts on `v2-m4-release`.
+- The Administrators-as-owner question below was not answered with the go-ahead, so the
+  weight stays as in the spec (-25, marked weak) until the owner decides.
+- Who: owner ("go").
+
+## 2026-11-15 — V2-M3 relevance design choices (reviewed by the owner; one question open)
 
 - **Scored from totals, not per file at draw time.** The background scan reads each file's owner
   (`GetNamedSecurityInfo`; the file's data is not opened, so nothing is downloaded from
