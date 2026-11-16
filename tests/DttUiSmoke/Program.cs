@@ -211,8 +211,22 @@ static class Program
         Shot("8-report");
         Invoke(Id("nextButton")); // Close
         Check(proc.WaitForExit(15000), "Close exits the tool");
-        Check(!File.Exists(jobFile) && Directory.GetFiles(Path.Combine(Path.GetDirectoryName(exe), "Logs"), "job_*.json").Length > 0,
-              "the finished job is moved to the log folder, so the next launch starts clean");
+        // v1.0.3: one log folder per job, combined logs, copied to <Dest>\Transfer logs
+        var jobDirs = new DirectoryInfo(Path.Combine(Path.GetDirectoryName(exe), "Logs")).GetDirectories(Environment.MachineName + " *")
+                          .Where(d => File.Exists(Path.Combine(d.FullName, "job.json"))).OrderByDescending(d => d.LastWriteTimeUtc).ToList();
+        Check(!File.Exists(jobFile) && jobDirs.Count > 0, "the finished job is moved into its own log folder as job.json, so the next launch starts clean");
+        if (jobDirs.Count > 0)
+        {
+            var names = jobDirs[0].GetFiles().Select(f => f.Name).OrderBy(n => n).ToList();
+            Check(names.Contains("copy.log") && names.Contains("scan.log") && names.All(n => new[] { "copy.log", "scan.log", "retry.log", "failures.csv", "job.json" }.Contains(n)),
+                  "the job's folder holds one log per kind of run: " + string.Join(", ", names));
+            string published = Path.Combine(dest, "Transfer logs", jobDirs[0].Name);
+            Check(Directory.Exists(published) && names.All(n => File.Exists(Path.Combine(published, n))),
+                  "the job's logs, job.json included, are copied to <Dest>\\Transfer logs\\" + jobDirs[0].Name);
+            string copyLog = File.ReadAllText(Path.Combine(jobDirs[0].FullName, "copy.log"), System.Text.Encoding.Unicode);
+            Check(System.Text.RegularExpressions.Regex.Matches(copyLog, @"^\s*Started : ", System.Text.RegularExpressions.RegexOptions.Multiline).Count == 2,
+                  "copy.log holds both folder jobs' runs, one after the other");
+        }
         Wipe(dest);
     }
 

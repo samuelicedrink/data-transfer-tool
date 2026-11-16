@@ -148,6 +148,8 @@ namespace DataTransfer.Core
         [DataMember] public DateTime? StartedUtc { get; set; }
         [DataMember] public DateTime? FinishedUtc { get; set; }
         [DataMember] public string LastMessage { get; set; }
+        /// <summary>Name of this job's log folder (see JobLogs.FolderName); kept so a resumed job uses the same one.</summary>
+        [DataMember] public string LogFolderName { get; set; }
 
         [OnDeserialized]
         void Fix(StreamingContext c)

@@ -18,6 +18,7 @@ namespace DataTransferTool
         readonly ListView failures = new ListView { Name = "failuresList", Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, HeaderStyle = ColumnHeaderStyle.Nonclickable };
         readonly Label failuresLabel = new Label { Name = "failuresLabel", Dock = DockStyle.Top, AutoSize = true, Font = Ui.BoldFont, Padding = new Padding(0, 10, 0, 4) };
         readonly Label csvLabel = new Label { Name = "csvLabel", AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(8, 8, 3, 3) };
+        readonly Label logsLabel = new Label { Name = "logsLocationLabel", AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(8, 8, 3, 3) };
         readonly Label activityLabel = new Label { Name = "reportActivityLabel", AutoSize = true, ForeColor = Ui.Muted, Margin = new Padding(8, 8, 3, 3) };
         readonly ProgressBar retryBar = new ProgressBar { Name = "retryBar", Width = 160, Style = ProgressBarStyle.Marquee, Visible = false, Margin = new Padding(8, 8, 3, 3) };
         readonly Button retryButton = Ui.Button("retryButton", "Retry failed");
@@ -47,7 +48,7 @@ namespace DataTransferTool
             top.Controls.Add(outcomeLabel);
 
             var bar = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true, Padding = new Padding(0, 6, 0, 0) };
-            bar.Controls.AddRange(new Control[] { retryButton, continueButton, openCsvButton, saveCsvButton, logsButton, retryBar, activityLabel, csvLabel });
+            bar.Controls.AddRange(new Control[] { retryButton, continueButton, openCsvButton, saveCsvButton, logsButton, retryBar, activityLabel, csvLabel, logsLabel });
 
             Controls.Add(failures);
             Controls.Add(failuresLabel);
@@ -64,7 +65,7 @@ namespace DataTransferTool
                         try { FailureCsv.Write(State.Job, d.FileName); activityLabel.Text = "Saved " + d.FileName; }
                         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { activityLabel.Text = "Could not save: " + ex.Message; }
             };
-            logsButton.Click += (s, e) => { try { Process.Start("explorer.exe", "\"" + State.Store.LogDirectory + "\""); } catch (Exception) { } };
+            logsButton.Click += (s, e) => { try { Process.Start("explorer.exe", "\"" + State.Store.JobLogDirectory(State.Job) + "\""); } catch (Exception) { } };
         }
 
         public override string Title => "Report";
@@ -73,7 +74,14 @@ namespace DataTransferTool
         public override bool CanGoNext => !busy;
         public override string NextText => "Close";
 
-        public override void OnEnter() => Fill();
+        public override void OnEnter()
+        {
+            Fill();
+            logsLabel.Text = "Copying the logs to the destination...";
+            RunStep.PublishLogs(State).ContinueWith(t => { if (IsHandleCreated) BeginInvoke((Action)(() => ShowLogs(t.Result))); });
+        }
+
+        void ShowLogs(string text) { if (!IsDisposed) logsLabel.Text = text; }
 
         void Fill()
         {
@@ -138,7 +146,7 @@ namespace DataTransferTool
             int before = State.Job.AllFailures().Count();
             activityLabel.Text = $"Retrying {before} item(s)...";
             RaiseButtonsChanged();
-            var engine = new CopyEngine(State.Job, State.Store.LogDirectory)
+            var engine = new CopyEngine(State.Job, State.Store.JobLogDirectory(State.Job))
             {
                 Profiles = State.Profiles,
                 SaveState = j => { try { State.Store.Save(j); } catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException) { } }
@@ -152,6 +160,7 @@ namespace DataTransferTool
             int after = State.Job.AllFailures().Count();
             Fill();
             activityLabel.Text = $"Retry finished: {before - after} of {before} now copied, {after} still failing.";
+            ShowLogs(await RunStep.PublishLogs(State));
         }
     }
 }

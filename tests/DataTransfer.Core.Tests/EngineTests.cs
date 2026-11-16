@@ -319,9 +319,9 @@ namespace DataTransfer.Core.Tests
 
             // the failure points at its entry in the Robocopy log (v1.0.2): the last attempt, a retry log
             string logFile = Path.Combine(root, "logs", f.LogFile);
-            Assert.That(f.LogFile, Does.Contain("_retry_"), "the latest log that tried this file");
+            Assert.That(f.LogFile, Is.EqualTo("retry.log"), "the latest log that tried this file: the retries, appended to one file");
             Assert.That(File.Exists(logFile), "log file exists: " + f.LogFile);
-            string[] logLines = File.ReadAllText(logFile, System.Text.Encoding.Unicode).Split('\n');
+            string[] logLines = File.ReadAllText(logFile, System.Text.Encoding.Unicode).TrimStart('\uFEFF').Split('\n');
             string entry = logLines[f.LogLine - 1].TrimEnd('\r');
             Assert.That(entry, Does.Contain(" ERROR 32 ").And.EndWith(locked), "line " + f.LogLine + " is the error entry");
             string csv = Path.Combine(root, "t4", "failures.csv");

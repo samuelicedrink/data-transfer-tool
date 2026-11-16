@@ -51,6 +51,9 @@ namespace DataTransfer.Core
         /// <summary>Lines read so far = the line number of the current line in the log.</summary>
         public int LineNumber { get; private set; }
 
+        /// <summary>The log already holds this many lines from earlier runs; numbering carries on after them.</summary>
+        public void ContinueAfter(int lines) => LineNumber = lines;
+
         public Action<LogEntry> OnEntry;
         public Action<FileFailure> OnError;
 

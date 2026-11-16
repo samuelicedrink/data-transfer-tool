@@ -80,7 +80,7 @@ namespace DataTransferTool
 
         void RunChecks()
         {
-            var pf = new PreflightEngine(State.Job, State.Store.LogDirectory) { Profiles = State.Profiles, DestinationPassword = State.Password };
+            var pf = new PreflightEngine(State.Job, State.Store.JobLogDirectory(State.Job)) { Profiles = State.Profiles, DestinationPassword = State.Password };
             pf.CheckCompleted += r => BeginInvoke((Action)(() => { UpdateItem(r); if (list.SelectedItems.Count == 0) SelectNextOpen(); }));
             pf.Activity += a => BeginInvoke((Action)(() => activityLabel.Text = a));
             State.Preflight = pf;

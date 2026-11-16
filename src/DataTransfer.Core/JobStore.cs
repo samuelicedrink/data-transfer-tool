@@ -15,7 +15,11 @@ namespace DataTransfer.Core
         public const string FileName = "DataTransferJob.json";
         public string Directory { get; }
         public string JobFile => Path.Combine(Directory, FileName);
+        /// <summary>The Logs folder next to the tool; each job has a folder of its own inside it.</summary>
         public string LogDirectory => Path.Combine(Directory, "Logs");
+
+        /// <summary>This job's log folder: Logs\&lt;COMPUTERNAME&gt; &lt;date time&gt; &lt;id&gt;.</summary>
+        public string JobLogDirectory(JobDefinition job) => Path.Combine(LogDirectory, JobLogs.FolderName(job));
 
         public JobStore(string directory) { Directory = directory; }
 
@@ -79,15 +83,18 @@ namespace DataTransfer.Core
         }
 
         /// <summary>
-        /// Moves the job file into the log folder (kept as a record) so the next launch starts clean.
-        /// Saved credentials are deleted. Returns the archived path, or null if there was no job.
+        /// Moves the job file into the job's log folder as job.json (kept as a record) so the next
+        /// launch starts clean. Saved credentials are deleted. Returns the archived path, or null if
+        /// there was no job file.
         /// </summary>
-        public string Archive(string jobId)
+        public string Archive(JobDefinition job)
         {
             new CredentialStore(Directory).Delete();
             if (!File.Exists(JobFile)) return null;
-            System.IO.Directory.CreateDirectory(LogDirectory);
-            string target = Path.Combine(LogDirectory, $"job_{jobId}_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+            string folder = JobLogDirectory(job);
+            System.IO.Directory.CreateDirectory(folder);
+            string target = Path.Combine(folder, JobLogs.JobFile);
+            if (File.Exists(target)) File.Delete(target);
             File.Move(JobFile, target);
             return target;
         }

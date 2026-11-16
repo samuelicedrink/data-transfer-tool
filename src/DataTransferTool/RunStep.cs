@@ -65,7 +65,7 @@ namespace DataTransferTool
                 Cancel();
             };
             cancelArm.Tick += (s, e) => { cancelArm.Stop(); if (!cts.IsCancellationRequested) cancelButton.Text = "Cancel"; };
-            logsButton.Click += (s, e) => { try { Process.Start("explorer.exe", "\"" + State.Store.LogDirectory + "\""); } catch (Exception) { } };
+            logsButton.Click += (s, e) => { try { Process.Start("explorer.exe", "\"" + State.Store.JobLogDirectory(State.Job) + "\""); } catch (Exception) { } };
         }
 
         public override string Title => finished ? "Copy finished" : "Copying";
@@ -123,7 +123,7 @@ namespace DataTransferTool
                 { Add("Could not save the credentials for resume: " + ex.Message); }
             }
             else creds.Delete();
-            var engine = new CopyEngine(job, State.Store.LogDirectory)
+            var engine = new CopyEngine(job, State.Store.JobLogDirectory(job))
             {
                 Profiles = State.Profiles,
                 SaveState = j => { try { State.Store.Save(j); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { } },
@@ -132,7 +132,7 @@ namespace DataTransferTool
             };
             engine.Progress += p => { if (IsHandleCreated) BeginInvoke((Action)(() => Show(p))); };
             engine.Message += m => { if (IsHandleCreated) BeginInvoke((Action)(() => Add(m))); };
-            Add($"Job {job.Id}: {job.Sources.Count} folder job(s) to {job.DestinationRoot}. Logs: {State.Store.LogDirectory}");
+            Add($"Job {job.Id}: {job.Sources.Count} folder job(s) to {job.DestinationRoot}. Logs: {State.Store.JobLogDirectory(job)}");
             statusLabel.Text = "Starting...";
 
             Task.Run(() =>
@@ -169,13 +169,29 @@ namespace DataTransferTool
         /// <summary>Writes (or removes) the failures CSV in the log folder for the current job.</summary>
         internal static void WriteFailuresCsv(AppState state)
         {
-            string path = System.IO.Path.Combine(state.Store.LogDirectory, $"failures_{state.Job.ComputerName}_{state.Job.Id}.csv");
+            string path = System.IO.Path.Combine(state.Store.JobLogDirectory(state.Job), JobLogs.FailuresCsv);
             try
             {
                 if (state.Job.AllFailures().Any()) { FailureCsv.Write(state.Job, path); state.FailuresCsv = path; }
                 else { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); state.FailuresCsv = null; }
             }
             catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { state.FailuresCsv = null; }
+        }
+
+        /// <summary>
+        /// Copies the job's log folder to &lt;Destination&gt;\Transfer logs in the background. The text it
+        /// returns says where the logs are; the logs next to the tool are kept either way.
+        /// </summary>
+        internal static Task<string> PublishLogs(AppState state)
+        {
+            var job = state.Job;
+            string local = state.Store.JobLogDirectory(job);
+            return Task.Run(() =>
+            {
+                try { return "Logs copied to " + JobLogs.Publish(job, local); }
+                catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException)
+                { return $"Logs could not be copied to the destination ({ex.Message}). They are in {local}"; }
+            });
         }
 
         void Add(string text)
@@ -214,6 +230,7 @@ namespace DataTransferTool
             Add(headline);
             WriteFailuresCsv(State);
             if (State.FailuresCsv != null) Add("List of files not copied: " + State.FailuresCsv);
+            PublishLogs(State).ContinueWith(p => { if (IsHandleCreated) BeginInvoke((Action)(() => Add(p.Result))); });
             if (error != null) Add("Error: " + error);
             RaiseButtonsChanged();
             if (closeWhenDone) CloseRequested?.Invoke();
