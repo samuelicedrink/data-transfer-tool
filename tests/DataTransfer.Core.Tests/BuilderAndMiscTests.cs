@@ -43,7 +43,7 @@ namespace DataTransfer.Core.Tests
             Assert.That(cmd, Is.EqualTo(
                 "\"C:\\Users\\Anna\\Documents\" \"E:\\Backup\\PC01\\C\\Users\\Anna\\Documents\" " +
                 "/E /B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /BYTES /FP /XA:O " +
-                "/XF \"desktop.ini\" \"thumbs.db\" \"~$*\" \"*.tmp\" /UNILOG:\"C:\\Logs\\a.log\""));
+                "/XF \"desktop.ini\" \"thumbs.db\" \"~$*\" \"*.tmp\" /UNILOG+:\"C:\\Logs\\a.log\""));
         }
 
         [Test]
@@ -116,7 +116,7 @@ namespace DataTransfer.Core.Tests
             Assert.That(one.Single(), Is.EqualTo(
                 "\"C:\\Data\\Sub\" \"E:\\Backup\\PC01\\C\\Data\\Sub\" \"a b.docx\" \"c.xlsx\" " +
                 "/B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /BYTES /FP /XA:O"));
-            Assert.That(RobocopyCommandBuilder.WithLog(one[0], @"C:\x y\l.log"), Does.EndWith(" /UNILOG:\"C:\\x y\\l.log\""));
+            Assert.That(RobocopyCommandBuilder.WithLog(one[0], @"C:\x y\l.log"), Does.EndWith(" /UNILOG+:\"C:\\x y\\l.log\""));
 
             var names = Enumerable.Range(0, 3000).Select(i => $"file number {i:00000} with a longish name.docx").ToList();
             var many = RobocopyCommandBuilder.BuildFileRetry(j, @"C:\Data\Sub", names);

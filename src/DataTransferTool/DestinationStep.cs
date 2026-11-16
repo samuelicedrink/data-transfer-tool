@@ -150,7 +150,7 @@ namespace DataTransferTool
             Show(CheckStatus.NotRun, "Testing...");
             try
             {
-                var pf = new PreflightEngine(State.Job, State.Store.LogDirectory) { Profiles = State.Profiles, DestinationPassword = State.Password };
+                var pf = new PreflightEngine(State.Job, State.Store.JobLogDirectory(State.Job)) { Profiles = State.Profiles, DestinationPassword = State.Password };
                 var r = await Task.Run(() => pf.Run(PreflightEngine.Destination, CancellationToken.None));
                 Show(r.Status, (r.Status == CheckStatus.Pass ? "OK: " : "") + r.Summary + (r.Details.Count > 0 ? "\r\n" + string.Join("\r\n", r.Details) : ""));
             }

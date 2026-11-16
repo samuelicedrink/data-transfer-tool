@@ -17,8 +17,10 @@ namespace DataTransfer.Core
         readonly char[] chars = new char[64 * 1024 + 2];
         readonly StringBuilder pending = new StringBuilder();
         FileStream fs;
+        readonly long startOffset;
 
-        public LogTail(string path, Action<string> onLine) { this.path = path; this.onLine = onLine; }
+        /// <param name="startOffset">Byte offset to start reading at (the end of earlier runs in an appended log).</param>
+        public LogTail(string path, Action<string> onLine, long startOffset = 0) { this.path = path; this.onLine = onLine; this.startOffset = startOffset; }
 
         /// <summary>Reads whatever has been appended since the last call.</summary>
         public void Pump()
@@ -28,6 +30,7 @@ namespace DataTransfer.Core
                 if (!File.Exists(path)) return;
                 try { fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); }
                 catch (IOException) { return; }
+                if (startOffset > 0) fs.Seek(startOffset, SeekOrigin.Begin);
             }
             int n;
             while ((n = fs.Read(bytes, 0, bytes.Length)) > 0) Decode(bytes, n);
@@ -87,10 +90,11 @@ namespace DataTransfer.Core
         {
             Arguments = arguments;
             LogPath = logPath;
-            Directory.CreateDirectory(Path.GetDirectoryName(logPath));
-            if (File.Exists(logPath)) File.Delete(logPath);
+            // logs are appended (/UNILOG+): one file per kind of run in the job's log folder
+            var (offset, lines) = JobLogs.PrepareForAppend(logPath);
             Parser.LogFile = Path.GetFileName(logPath);
-            tail = new LogTail(logPath, Parser.Feed);
+            Parser.ContinueAfter(lines);
+            tail = new LogTail(logPath, Parser.Feed, offset);
             process = new Process
             {
                 StartInfo = new ProcessStartInfo(RobocopyPath, arguments)

@@ -48,7 +48,7 @@ namespace DataTransfer.Core
             var xf = o.ExcludeFiles.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
             if (xf.Count > 0) sb.Append(" /XF ").Append(string.Join(" ", xf.Select(Quote)));
 
-            sb.Append(" /UNILOG:").Append(Quote(logPath));
+            sb.Append(" /UNILOG+:").Append(Quote(logPath));
             if (sb.Length > MaxArgumentLength)
                 throw new InvalidOperationException($"Too many exclusions for one Robocopy command ({sb.Length} characters). Untick fewer subfolders under {folder}.");
             return sb.ToString();
@@ -80,7 +80,7 @@ namespace DataTransfer.Core
             return result;
         }
 
-        public static string WithLog(string command, string logPath) => command + " /UNILOG:" + Quote(logPath);
+        public static string WithLog(string command, string logPath) => command + " /UNILOG+:" + Quote(logPath);
 
         /// <summary>
         /// Profile-level exclusions (AppData by default) as full paths, so that a folder that merely

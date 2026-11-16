@@ -75,7 +75,7 @@ namespace DataTransferTool
             if (saved == null || !saved.IsUnfinished)
             {
                 // a finished job from an earlier session is kept as a record in the log folder
-                if (saved != null) try { state.Store.Archive(saved.Id); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                if (saved != null) try { state.Store.Archive(saved); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
                 Go(SelectIndex, forward: true);
                 return;
             }
@@ -87,7 +87,7 @@ namespace DataTransferTool
             using (var f = new ResumeForm(saved, credsOk)) answer = f.ShowDialog(this);
             if (answer != DialogResult.Yes)
             {
-                try { state.Store.Archive(saved.Id); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                try { state.Store.Archive(saved); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
                 Go(SelectIndex, forward: true);
                 return;
             }
@@ -111,7 +111,11 @@ namespace DataTransferTool
             {
                 // a finished job is archived to the log folder so the next launch starts clean
                 if (state.Job.State == JobState.Completed)
-                    try { state.Store.Archive(state.Job.Id); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                {
+                    try { state.Store.Archive(state.Job); } catch (Exception ex) when (ex is System.IO.IOException || ex is UnauthorizedAccessException) { }
+                    // job.json joins the logs at the destination; a destination that does not answer cannot hold up closing
+                    RunStep.PublishLogs(state).Wait(TimeSpan.FromSeconds(15));
+                }
                 Close();
                 return;
             }

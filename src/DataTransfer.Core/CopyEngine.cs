@@ -46,7 +46,7 @@ namespace DataTransfer.Core
         long? baselineFree;
         long freeDelta;
         TimeSpan lastFreeCheck = TimeSpan.FromSeconds(-10), lastReport = TimeSpan.FromSeconds(-10);
-        int sourceIndex, logSequence;
+        int sourceIndex;
 
         public event Action<ProgressSnapshot> Progress;
         public event Action<string> Message;
@@ -320,7 +320,7 @@ namespace DataTransfer.Core
 
         Attempt RunMonitored(Func<string, string> argumentsFor, EnginePhase phase, string tag, CancellationToken ct, bool watchDestination)
         {
-            string log = Path.Combine(LogDirectory, $"{job.Id}_{tag}_s{sourceIndex}_{++logSequence:000}.log");
+            string log = Path.Combine(LogDirectory, tag == "copy" ? JobLogs.CopyLog : tag == "retry" ? JobLogs.RetryLog : tag == "scan" ? JobLogs.ScanLog : tag + ".log");
             using (var run = new RobocopyRun(argumentsFor(log), log))
             {
                 var a = new Attempt { Parser = run.Parser };

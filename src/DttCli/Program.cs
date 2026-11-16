@@ -47,7 +47,7 @@ namespace DttCli
             var cts = new CancellationTokenSource();
             Console.CancelKeyPress += (s, e) => { e.Cancel = true; Console.WriteLine("\ncancelling..."); cts.Cancel(); };
 
-            var engine = new CopyEngine(job, store.LogDirectory);
+            var engine = new CopyEngine(job, store.JobLogDirectory(job));
             engine.Message += m => Console.WriteLine("\n" + m);
             var lastLine = DateTime.MinValue;
             engine.Progress += p =>
@@ -75,7 +75,7 @@ namespace DttCli
                 var scan = engine.Scan(cts.Token);
                 if (scan.Cancelled) return 1;
                 if (scan.FatalError != null) { Console.WriteLine("\nscan failed: " + scan.FatalError); return 1; }
-                engine = new CopyEngine(job, store.LogDirectory) { SaveState = store.Save, ExpectedFiles = scan.Totals.FilesCopied, ExpectedBytes = scan.Totals.BytesCopied };
+                engine = new CopyEngine(job, store.JobLogDirectory(job)) { SaveState = store.Save, ExpectedFiles = scan.Totals.FilesCopied, ExpectedBytes = scan.Totals.BytesCopied };
                 engine.Message += m => Console.WriteLine("\n" + m);
                 engine.Progress += p =>
                 {
@@ -105,7 +105,7 @@ namespace DttCli
         // Checks only look. Applications are closed only when --fix is given.
         static int Preflight(JobDefinition job, JobStore store, string[] args)
         {
-            var pf = new PreflightEngine(job, store.LogDirectory);
+            var pf = new PreflightEngine(job, store.JobLogDirectory(job));
             if (!string.IsNullOrEmpty(job.DestinationUserName))
             {
                 Console.Write($"Password for {job.DestinationUserName} (not shown, not stored): ");
