@@ -18,6 +18,8 @@ namespace DataTransferTool
         static TextBox List(string name) => new TextBox { Name = name, Multiline = true, ScrollBars = ScrollBars.Vertical, AcceptsReturn = true, Dock = DockStyle.Fill, Height = 110 };
         static NumericUpDown Number(string name, int min, int max) => new NumericUpDown { Name = name, Minimum = min, Maximum = max, Width = 80 };
 
+        protected override bool ShowWithoutActivation => Ui.SmokeQuiet;
+
         public OptionsForm(JobDefinition job)
         {
             this.job = job;

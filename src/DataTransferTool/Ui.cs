@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using System.Windows.Forms.VisualStyles;
 using DataTransfer.Core;
@@ -117,6 +118,27 @@ namespace DataTransferTool
             s == CheckStatus.Pass ? Good : s == CheckStatus.Warn ? Warning : s == CheckStatus.Fail ? Bad : Muted;
 
         public static string Size(long bytes) => PreflightEngine.Size(bytes);
+
+        /// <summary>
+        /// SmokeTest build only: with DTT_SMOKE_QUIET=1 the windows open on a screen other than the
+        /// main one and never take the focus, so the automated UI test can run while someone keeps
+        /// using the PC (their typing went into the tool before). Always false in the Release build.
+        /// </summary>
+#if SMOKETEST
+        public static readonly bool SmokeQuiet = Environment.GetEnvironmentVariable("DTT_SMOKE_QUIET") == "1";
+#else
+        public const bool SmokeQuiet = false;
+#endif
+
+        /// <summary>Puts a top-level window in the middle of the first screen that is not the main one.</summary>
+        public static void PlaceForSmokeTest(Form f)
+        {
+            if (!SmokeQuiet) return;
+            var screen = Screen.AllScreens.FirstOrDefault(s => !s.Primary) ?? Screen.PrimaryScreen;
+            var wa = screen.WorkingArea;
+            f.StartPosition = FormStartPosition.Manual;
+            f.Location = new Point(wa.X + Math.Max(0, (wa.Width - f.Width) / 2), wa.Y + Math.Max(0, (wa.Height - f.Height) / 2));
+        }
 
         public static string Duration(TimeSpan t) =>
             t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes:00} min" : t.TotalMinutes >= 1 ? $"{t.Minutes} min {t.Seconds:00} s" : $"{t.Seconds} s";

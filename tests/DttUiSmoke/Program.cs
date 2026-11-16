@@ -33,6 +33,22 @@ static class Program
         if (a.Length < 6) { Console.WriteLine("usage: DttUiSmoke <exe> <shots> <work> <small source> <large source> <many-files source>"); return 2; }
         exe = Path.GetFullPath(a[0]); shots = a[1]; work = a[2]; small = a[3]; large = a[4]; many = a[5];
         Directory.CreateDirectory(shots);
+        // DTT_SMOKE_QUIET=1: the tool runs on the second screen without taking the focus (SmokeTest
+        // build), and this watcher checks that it never does, so the PC can be used meanwhile
+        bool quiet = Environment.GetEnvironmentVariable("DTT_SMOKE_QUIET") == "1";
+        int focusTaken = 0;
+        var watching = new CancellationTokenSource();
+        if (quiet)
+            new Thread(() =>
+            {
+                while (!watching.IsCancellationRequested)
+                {
+                    var p = proc;
+                    GetWindowThreadProcessId(GetForegroundWindow(), out uint pid);
+                    if (p != null && pid == (uint)p.Id) Interlocked.Increment(ref focusTaken);
+                    Thread.Sleep(100);
+                }
+            }) { IsBackground = true }.Start();
         try
         {
             string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEF"; // D resumes the job C leaves behind
@@ -45,6 +61,8 @@ static class Program
         }
         catch (Exception ex) { Fail("crashed: " + ex); Shot("error"); }
         finally { try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { } }
+        watching.Cancel();
+        if (quiet) Check(focusTaken == 0, $"the tool never took the focus from the person using the PC ({focusTaken} check(s) found it in front)");
         Console.WriteLine(fails == 0 ? "ALL PASSED" : $"{fails} FAILURE(S)");
         return fails == 0 ? 0 : 1;
     }
@@ -619,6 +637,8 @@ static class Program
     // The test never brings the tool to the front and never sends keystrokes through the desktop,
     // so it cannot type into, or cover, whatever the person at the PC is using.
     [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr w, IntPtr l);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd, out RECT r);
     [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }

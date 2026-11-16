@@ -32,6 +32,7 @@ namespace DataTransferTool
             StartPosition = FormStartPosition.CenterScreen;
             Size = new Size(980, 680);
             MinimumSize = new Size(800, 560);
+            Ui.PlaceForSmokeTest(this);
 
             runStep = new RunStep(state) { CloseRequested = () => BeginInvoke((Action)Close) };
             destinationStep = new DestinationStep(state);
@@ -66,6 +67,9 @@ namespace DataTransferTool
             Shown += (s, e) => Start();
             FormClosing += OnClosing;
         }
+
+        /// <summary>SmokeTest build with DTT_SMOKE_QUIET=1: the window never takes the focus.</summary>
+        protected override bool ShowWithoutActivation => Ui.SmokeQuiet;
 
         /// <summary>Offers to resume an unfinished job; otherwise starts on the Select screen.</summary>
         void Start()

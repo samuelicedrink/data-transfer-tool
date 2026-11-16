@@ -9,6 +9,8 @@ namespace DataTransferTool
     /// <summary>Shown at start-up when the saved job did not finish: resume it, or start a new job.</summary>
     internal sealed class ResumeForm : Form
     {
+        protected override bool ShowWithoutActivation => Ui.SmokeQuiet;
+
         public ResumeForm(JobDefinition job, bool credentialsSaved)
         {
             Name = "ResumeForm";
