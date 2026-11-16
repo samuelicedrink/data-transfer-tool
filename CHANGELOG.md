@@ -48,6 +48,16 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 - Folder tree: a collapsed folder with exactly one loaded subfolder kept a stale tick box on that subfolder after ticking or unticking (only folders with two or more children were refreshed). Found while building V2-M2; also fixed for v1 in 1.0.1.
 
+## [1.0.2] - 2026-11-15
+
+### Added
+
+- Every failure now records where its error is in the Robocopy logs: the failures CSV has two new columns at the end, **Log file** (for example `<job>_retry_s1_086.log`, in the `Logs` folder) and **Log line** (the line number of the `ERROR` entry, as a text editor shows it). When an item was tried more than once, they point at the latest attempt. The report's Details column shows the same. Asked for by the owner after a real-life test, to trace each CSV row back to its log entry. The job file keeps both, so they survive a resume.
+
+### Test findings (v1.0.2, 2026-11-15, not elevated)
+
+- 84 unit tests: 82 pass, 2 skipped (elevated-only). The locked-file engine test now opens the named log, reads the named line and finds the `ERROR 32` entry for that file there, and checks the two CSV columns. UI smoke A to F pass.
+
 ## [1.0.1] - 2026-11-15
 
 ### Fixed

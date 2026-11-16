@@ -46,6 +46,11 @@ namespace DataTransfer.Core
         FileFailure awaitingMessage;
         bool fatalAwaitingDetail;
 
+        /// <summary>File name of the log being read; copied into each failure so it can be found again.</summary>
+        public string LogFile { get; set; }
+        /// <summary>Lines read so far = the line number of the current line in the log.</summary>
+        public int LineNumber { get; private set; }
+
         public Action<LogEntry> OnEntry;
         public Action<FileFailure> OnError;
 
@@ -81,6 +86,7 @@ namespace DataTransfer.Core
         public void Feed(string line)
         {
             if (line == null) return;
+            LineNumber++;
             if (line.Length > 0 && line[0] == '\uFEFF') line = line.Substring(1);
             line = line.TrimEnd('\r');
 
@@ -180,6 +186,8 @@ namespace DataTransfer.Core
             f.Category = Categorize(code);
             f.Message = Win32Message(code);
             f.Time = m.Groups["ts"].Value;
+            f.LogFile = LogFile;
+            f.LogLine = LineNumber;
             f.Attempts++;
             awaitingMessage = f;
             OnError?.Invoke(f);

@@ -94,6 +94,10 @@ namespace DataTransfer.Core
         [DataMember] public long Size { get; set; }
         [DataMember] public int Attempts { get; set; }
         [DataMember] public string Time { get; set; }
+        /// <summary>Name of the Robocopy log (in the Logs folder) that holds this error; the latest one when the item was retried.</summary>
+        [DataMember] public string LogFile { get; set; }
+        /// <summary>Line number of the ERROR entry in that log, counted from 1 as a text editor shows it.</summary>
+        [DataMember] public int LogLine { get; set; }
 
         public override string ToString() => $"{Category} ({ErrorCode}) {SourcePath}: {Message}";
     }

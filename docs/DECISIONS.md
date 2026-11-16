@@ -8,6 +8,15 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — v1.0.2: failures point at their log entry; V2-M4 paused
+
+- After a real-life test with v1 the owner asked for each error in the failures CSV to name its
+  entry in the Robocopy logs. Done on branch `v1` as `v1.0.2` (CSV columns *Log file* and
+  *Log line*; latest attempt when retried) and merged into `main` for v2.
+- V2-M4 is paused on `v2-m4-release` at the owner's request (v1 improvements first). Its
+  report change is committed there as work in progress.
+- Who: owner.
+
 ## 2026-11-15 — Owner approved V2-M3
 
 - V2-M3 merged into `main` and tagged `v2-m3`. V2-M4 starts on `v2-m4-release`.
