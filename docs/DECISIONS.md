@@ -8,7 +8,15 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
-## 2026-11-15 — V2-M2 design choices (to be reviewed by the owner)
+## 2026-11-15 — Owner approved V2-M2; files get their own tick box; v1 fix released
+
+- V2-M2 merged into `main` and tagged `v2-m2`. V2-M3 starts on `v2-m3-relevance`.
+- Files get tick boxes of their own (owner's answer to the open question below). Built in
+  V2-M3, before the relevance score.
+- The stale tick box bug found in V2-M2 is fixed on branch `v1` and released as `v1.0.1`.
+- Who: owner.
+
+## 2026-11-15 — V2-M2 design choices (reviewed by the owner)
 
 - **Tree-grid built on the native tree view.** The names and the Modified and Size columns are
   drawn by the tool on the right of each row; tick boxes, keyboard use, lazy loading and UI
