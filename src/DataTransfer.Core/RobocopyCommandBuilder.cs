@@ -20,6 +20,7 @@ namespace DataTransfer.Core
             if (o.BackupMode) sb.Append("/B ");
             sb.Append($"/R:{o.Retries} /W:{o.WaitSeconds} /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:{o.Threads} /NP /BYTES /FP");
             if (o.ExcludeCloudOnly) sb.Append(" /XA:O");
+            if (!o.KeepHiddenAttributes) sb.Append(" /A-:SH"); // copied files are not Hidden or System; folders are handled by Unhide
             return sb.ToString();
         }
 

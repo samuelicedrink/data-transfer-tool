@@ -42,7 +42,7 @@ namespace DataTransfer.Core.Tests
             string cmd = RobocopyCommandBuilder.Build(j, j.Sources[0], @"C:\Logs\a.log", false, Profiles);
             Assert.That(cmd, Is.EqualTo(
                 "\"C:\\Users\\Anna\\Documents\" \"E:\\Backup\\PC01\\C\\Users\\Anna\\Documents\" " +
-                "/E /B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /BYTES /FP /XA:O " +
+                "/E /B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /BYTES /FP /XA:O /A-:SH " +
                 "/XF \"desktop.ini\" \"thumbs.db\" \"~$*\" \"*.tmp\" /UNILOG:\"C:\\Logs\\a.log\""));
         }
 
@@ -60,7 +60,7 @@ namespace DataTransfer.Core.Tests
             var j = Job(@"C:\Data");
             j.Options.BackupMode = false; j.Options.ExcludeCloudOnly = false; j.Options.Threads = 4; j.Options.Retries = 3; j.Options.WaitSeconds = 9;
             string cmd = RobocopyCommandBuilder.Build(j, j.Sources[0], @"C:\l.log", false, Profiles);
-            Assert.That(cmd, Does.Contain("/E /R:3 /W:9 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:4 /NP /BYTES /FP /XF"));
+            Assert.That(cmd, Does.Contain("/E /R:3 /W:9 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:4 /NP /BYTES /FP /A-:SH /XF"));
             Assert.That(cmd, Does.Not.Contain("/B ").And.Not.Contain("/XA:O"));
         }
 
@@ -115,7 +115,7 @@ namespace DataTransfer.Core.Tests
             var one = RobocopyCommandBuilder.BuildFileRetry(j, @"C:\Data\Sub", new[] { "a b.docx", "c.xlsx" });
             Assert.That(one.Single(), Is.EqualTo(
                 "\"C:\\Data\\Sub\" \"E:\\Backup\\PC01\\C\\Data\\Sub\" \"a b.docx\" \"c.xlsx\" " +
-                "/B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /BYTES /FP /XA:O"));
+                "/B /R:1 /W:2 /XJ /COPY:DAT /DCOPY:DAT /FFT /MT:8 /NP /BYTES /FP /XA:O /A-:SH"));
             Assert.That(RobocopyCommandBuilder.WithLog(one[0], @"C:\x y\l.log"), Does.EndWith(" /UNILOG:\"C:\\x y\\l.log\""));
 
             var names = Enumerable.Range(0, 3000).Select(i => $"file number {i:00000} with a longish name.docx").ToList();

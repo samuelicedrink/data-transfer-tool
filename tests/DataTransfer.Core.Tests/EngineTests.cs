@@ -177,6 +177,67 @@ namespace DataTransfer.Core.Tests
         }
 
         [Test]
+        public void HiddenAndSystemItems_AreVisibleAtTheDestination_SourceUntouched()
+        {
+            // v1.0.3: a copied drive root arrived Hidden + System and could not be seen in Explorer
+            var rng = new Random(11);
+            string src = Path.Combine(root, "t10", "src"), dest = Path.Combine(root, "t10", "dest");
+            Write(Path.Combine(src, "normal.txt"), 100, rng);
+            Write(Path.Combine(src, "hidden.txt"), 100, rng);
+            Write(Path.Combine(src, "system hidden.txt"), 100, rng);
+            Write(Path.Combine(src, "read only.txt"), 100, rng);
+            Write(Path.Combine(src, "hidden folder", "deeper", "inner.txt"), 100, rng);
+            File.SetAttributes(Path.Combine(src, "hidden.txt"), FileAttributes.Hidden);
+            File.SetAttributes(Path.Combine(src, "system hidden.txt"), FileAttributes.Hidden | FileAttributes.System);
+            File.SetAttributes(Path.Combine(src, "read only.txt"), FileAttributes.ReadOnly);
+            new DirectoryInfo(Path.Combine(src, "hidden folder")).Attributes |= FileAttributes.Hidden | FileAttributes.System;
+            new DirectoryInfo(src).Attributes |= FileAttributes.Hidden | FileAttributes.System;   // like a drive root
+            try
+            {
+                const FileAttributes HS = FileAttributes.Hidden | FileAttributes.System;
+                System.Collections.Generic.List<string> StillHidden(string top) =>
+                    new[] { top }.Concat(Directory.EnumerateFileSystemEntries(top, "*", SearchOption.AllDirectories))
+                                 .Where(p => (File.GetAttributes(p) & HS) != 0).ToList();
+
+                // the old behaviour, kept as an option: attributes are copied
+                var keep = NewJob(Path.Combine(root, "t10", "dest_keep"), src);
+                keep.Options.KeepHiddenAttributes = true;
+                Assert.That(NewEngine(keep).Run(CancellationToken.None), Is.EqualTo(JobOutcome.Completed));
+                Assert.That(StillHidden(keep.DestinationFor(src)).Count, Is.EqualTo(4), "folder job root, hidden folder and two files");
+
+                var messages = new List<string>();
+                var job = NewJob(dest, src);
+                Assert.That(NewEngine(job, messages).Run(CancellationToken.None), Is.EqualTo(JobOutcome.Completed));
+                Assert.That(StillHidden(Path.Combine(dest, "TESTPC")), Is.Empty, "nothing hidden under <Dest>\\<COMPUTERNAME>");
+                Assert.That(messages.Any(m => m.StartsWith("Made 2 hidden item(s) visible")), "the two folders; files are covered by /A-:SH: " + string.Join(" | ", messages));
+                Assert.That(File.GetAttributes(job.DestinationFor(Path.Combine(src, "read only.txt"))) & FileAttributes.ReadOnly, Is.EqualTo(FileAttributes.ReadOnly), "read-only is kept");
+                Assert.That(job.Totals().FilesCopied, Is.EqualTo(5));
+                AssertMirrored(job, src);
+
+                // the source is never changed
+                Assert.That(new DirectoryInfo(src).Attributes & HS, Is.EqualTo(HS));
+                Assert.That(File.GetAttributes(Path.Combine(src, "hidden.txt")) & FileAttributes.Hidden, Is.EqualTo(FileAttributes.Hidden));
+
+                // a second run copies nothing and leaves everything visible
+                var again = NewJob(dest, src);
+                Assert.That(NewEngine(again).Run(CancellationToken.None), Is.EqualTo(JobOutcome.Completed));
+                Assert.That(again.Totals().FilesCopied, Is.EqualTo(0));
+                Assert.That(StillHidden(Path.Combine(dest, "TESTPC")), Is.Empty);
+
+                // a destination left hidden by an older version is repaired by running the job again
+                var repair = NewJob(Path.Combine(root, "t10", "dest_keep"), src);
+                Assert.That(NewEngine(repair).Run(CancellationToken.None), Is.EqualTo(JobOutcome.Completed));
+                Assert.That(repair.Totals().FilesCopied, Is.EqualTo(0));
+                Assert.That(StillHidden(Path.Combine(root, "t10", "dest_keep", "TESTPC")), Is.Empty);
+            }
+            finally
+            {
+                // so the fixture's clean-up can delete the tree
+                new DirectoryInfo(src).Attributes &= ~(FileAttributes.Hidden | FileAttributes.System);
+            }
+        }
+
+        [Test]
         public void AppData_ExcludedOnlyDirectlyUnderAProfile()
         {
             var rng = new Random(2);

@@ -23,6 +23,12 @@ namespace DataTransfer.Core
         [DataMember] public bool BackupMode { get; set; } = true;
         /// <summary>/XA:O. Skips cloud-only (OneDrive) files without downloading them.</summary>
         [DataMember] public bool ExcludeCloudOnly { get; set; } = true;
+        /// <summary>
+        /// False (default): copied files and folders are made visible at the destination: /A-:SH for
+        /// files, and the tool clears Hidden and System on folders after each folder job. True keeps
+        /// the source's Hidden and System attributes, as v1.0.0 to v1.0.2 did.
+        /// </summary>
+        [DataMember] public bool KeepHiddenAttributes { get; set; }
         /// <summary>Folder names excluded only directly under a user profile (passed as full paths).</summary>
         [DataMember] public List<string> ExcludeProfileDirs { get; set; } = new List<string> { "AppData" };
         /// <summary>Folder names excluded at any depth.</summary>
