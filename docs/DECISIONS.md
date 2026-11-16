@@ -8,6 +8,33 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — V2-M3 relevance design choices (to be reviewed by the owner)
+
+- **Scored from totals, not per file at draw time.** The background scan reads each file's owner
+  (`GetNamedSecurityInfo`; the file's data is not opened, so nothing is downloaded from
+  OneDrive) and adds files up by owner, profile, system area, kind and known app. A folder keeps
+  these totals, so picking another user redraws the columns at once, without a rescan.
+- **Weights exactly as in SPEC_V2** (`RelevanceWeights`, one place).
+- **Profiles** are the folders in the profiles directory; `Public`, `Default` and the like are
+  nobody's profile (no plus, no minus).
+- **Folder permissions** (+5): entries set on the file's own folder, not inherited ones, that
+  name the picked user. In practice that is the profile folder itself and folders shared by hand.
+- **Program or cache**: `.exe`, `.dll`, `.sys` and similar inside Windows, Program Files,
+  ProgramData or a profile's AppData; anything in a cache or temp folder. A downloaded installer
+  in Downloads is not a program file.
+- **Copied-in dates** (a weakness the spec names) are not detected yet; only owners give the
+  weak mark. Detecting them needs the creation time compared with the modified time, which the
+  scan does not keep; left for after the manual tests.
+- **No test accounts** (owner, 2026-11-15): the spec's "generated trees owned by different test
+  accounts" is done with simulated owners (made-up SIDs given to the classifier), plus read-only
+  checks of real owner and permission reading on files the test creates.
+- **Open question, Administrators as owner.** Files saved from an elevated program, or copied in
+  by an admin, are owned by Administrators. The spec scores that -25 ("installed programs") and
+  marks it weak. On this PC the generated test files score 35 % *Probably not* for the account
+  that made them. Proposal: when the picked user is a local admin, give Administrators-owned
+  files 0 instead of -25 (still marked weak), so their files outside Windows and Program Files
+  land in *Review* rather than *Probably not*. Not changed without the owner's answer.
+
 ## 2026-11-15 — AppData shown unticked under a ticked profile (V2-M3, to be reviewed by the owner)
 
 - The copy leaves each profile's `AppData` out (an Options setting since M2), but the tree showed

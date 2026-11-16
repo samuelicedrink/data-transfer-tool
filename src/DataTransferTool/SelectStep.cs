@@ -19,11 +19,14 @@ namespace DataTransferTool
         const string Waiting = "…";
 
         readonly TreeGrid tree = new TreeGrid { Name = "folderTree", Dock = DockStyle.Fill, HideSelection = false, ShowNodeToolTips = true, ShowLines = true };
-        readonly Label detailLabel = new Label { Name = "detailLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = 40, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 4, 0, 0), UseMnemonic = false };
+        readonly Label detailLabel = new Label { Name = "detailLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = Ui.BaseFont.Height * 3 + 10, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 4, 0, 0), UseMnemonic = false };
         readonly Timer scanTimer = new Timer { Interval = 300 };
         /// <summary>Folder rows still showing "…".</summary>
         readonly System.Collections.Generic.HashSet<TreeNode> waiting = new System.Collections.Generic.HashSet<TreeNode>();
         FolderScanner scanner;
+        RelevanceClassifier classifier;
+        /// <summary>Whose data relevance is estimated for; null = All users (no estimate).</summary>
+        RelevanceTarget target;
         readonly ListBox selectionList = new ListBox { Name = "selectionList", Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
         readonly Label summaryLabel = new Label { Name = "summaryLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = 48, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 6, 0, 0) };
         readonly TextBox addPathBox = Ui.TextBox("addPathBox", 300);
@@ -61,7 +64,10 @@ namespace DataTransferTool
             // tree-grid: names on the left, columns on the right
             tree.Columns.Add(new GridColumn { Header = "Modified", Width = TextRenderer.MeasureText("2026-12-31 23:59", Font).Width + 16 });
             tree.Columns.Add(new GridColumn { Header = "Size", Width = TextRenderer.MeasureText("1023.99 MB+", Font).Width + 16, Align = HorizontalAlignment.Right });
+            tree.Columns.Add(new GridColumn { Header = "Relevant", Width = TextRenderer.MeasureText("Relevant", Ui.BoldFont).Width + 16, Align = HorizontalAlignment.Right });
+            tree.Columns.Add(new GridColumn { Header = "Advice", Width = 160, Share = 0.28 });
             tree.CellText = CellText;
+            tree.CellColor = CellColor;
             tree.NodeColor = tn => tn.Tag is FileItem f && f.CloudOnly || tn.Tag is string ? Ui.Muted : Color.Empty;
             var grid = new Panel { Name = "gridPanel", Dock = DockStyle.Fill, BorderStyle = BorderStyle.FixedSingle };
             grid.Controls.Add(tree);
@@ -124,7 +130,8 @@ namespace DataTransferTool
         {
             if (State.Tree != null) return;
             LoadUsers();
-            scanner = new FolderScanner(State.Job.Options.BackupMode);
+            classifier = new RelevanceClassifier(State.Profiles.ProfileFolders);
+            scanner = new FolderScanner(State.Job.Options.BackupMode, classifier);
             scanTimer.Start();
             State.Tree = new FolderTree(FolderTree.FixedDrives())
             {
@@ -169,7 +176,7 @@ namespace DataTransferTool
             try
             {
                 var kids = State.Tree.EnsureChildren(n);
-                var files = FolderScanner.ListFiles(n.Path, MaxFilesShown);
+                var files = FolderScanner.ListFiles(n.Path, MaxFilesShown, classifier);
                 tree.BeginUpdate();
                 tn.Nodes.Clear();
                 foreach (var c in kids) tn.Nodes.Add(NewNode(c));
@@ -224,12 +231,40 @@ namespace DataTransferTool
             scanner.Request(paths);
         }
 
+        // columns: 0 Modified, 1 Size, 2 Relevant, 3 Advice
         string CellText(TreeNode tn, int column)
         {
-            if (tn.Tag is FileItem f) return column == 0 ? Date(f.ModifiedUtc) : GridSize(f.Size);
+            if (tn.Tag is FileItem f)
+            {
+                if (column == 0) return Date(f.ModifiedUtc);
+                if (column == 1) return GridSize(f.Size);
+                var fr = Relevance(tn);
+                return fr == null ? "" : column == 2 ? fr.Score + " %" : fr.Advice;
+            }
             if (!(tn.Tag is FolderNode n)) return null;
-            if (scanner == null || !scanner.TryGet(n.Path, out var s)) return Waiting;
-            return column == 0 ? Date(s.NewestUtc) : GridSize(s.Bytes) + (s.UnreadableFolders > 0 ? "+" : "");
+            if (scanner == null || !scanner.TryGet(n.Path, out var s)) return column >= 2 && target == null ? "" : Waiting;
+            if (column == 0) return Date(s.NewestUtc);
+            if (column == 1) return GridSize(s.Bytes) + (s.UnreadableFolders > 0 ? "+" : "");
+            var r = Relevance(tn);
+            return r == null ? "" : column == 2 ? r.Score + " %" : r.Advice;
+        }
+
+        /// <summary>Score and Advice of a row for the picked user; null with All users or before the numbers arrive.</summary>
+        RelevanceResult Relevance(TreeNode tn)
+        {
+            if (target == null || classifier == null) return null;
+            if (tn.Tag is FileItem f) return classifier.Evaluate(f.AsGroups(), target);
+            if (tn.Tag is FolderNode n && scanner.TryGet(n.Path, out var s)) return classifier.Evaluate(s.Groups, target);
+            return null;
+        }
+
+        Color CellColor(TreeNode tn, int column)
+        {
+            if (column < 2) return Color.Empty;
+            var r = Relevance(tn);
+            if (r == null) return Color.Empty;
+            if (r.Weak) return Ui.Warning;
+            return r.Score >= RelevanceWeights.Likely ? Ui.Good : r.Score < RelevanceWeights.Review ? Ui.Muted : Color.Empty;
         }
 
         static bool Matches(string pattern, string name) =>
@@ -267,19 +302,28 @@ namespace DataTransferTool
                        (tn.Parent?.Tag is FolderNode p && !p.Included && State.Tree.IsFileIncluded(p, f.Name) ? " Ticked on its own: copied without the rest of its folder." : "");
                 string rule = State.Job.Options.ExcludeFiles.FirstOrDefault(x => Matches(x, f.Name));
                 if (rule != null) text += $" Not copied even when ticked: it matches the exclusion \"{rule}\" (Options).";
+                text += RelevanceLine(tn);
             }
             else if (tn?.Tag is FolderNode n)
             {
-                if (!scanner.TryGet(n.Path, out var s)) text = $"{PathUtil.Trim(n.Path)}: counting files {Waiting}";
+                if (scanner == null || !scanner.TryGet(n.Path, out var s)) text = $"{PathUtil.Trim(n.Path)}: counting files {Waiting}";
                 else
                 {
                     text = $"{PathUtil.Trim(n.Path)}: {s.Files:N0} file(s), {Ui.Size(s.Bytes)}" + (s.NewestUtc.HasValue ? $", newest {Date(s.NewestUtc)}." : ".");
                     if (s.CloudFiles > 0) text += $" {s.CloudFiles:N0} cloud-only file(s) ({Ui.Size(s.CloudBytes)}) are counted but not copied.";
                     if (s.UnreadableFolders > 0) text += $" {s.UnreadableFolders:N0} folder(s) inside cannot be read, so the size is at least this.";
+                    text += RelevanceLine(tn);
                 }
             }
             else if (tn?.Tag is string) text = "Only the first " + MaxFilesShown.ToString("N0") + " files of a folder are listed; all of them are counted in its size and copied with it.";
             detailLabel.Text = text;
+        }
+
+        string RelevanceLine(TreeNode tn)
+        {
+            if (target == null) return "\r\nPick a user at the top left to estimate how relevant each item is to them.";
+            var r = Relevance(tn);
+            return r == null ? "" : $"\r\nRelevant to {target.Name}: {r.Score} %. {r.Advice}.";
         }
 
         protected override void Dispose(bool disposing)
@@ -390,6 +434,10 @@ namespace DataTransferTool
             if (!(userCombo.SelectedItem is UserItem item)) { accessLabel.Text = ""; return; }
             var u = item.User;
             State.Job.SelectedUserSid = u?.Sid;
+            // only the Relevant and Advice columns change; nothing is ticked (owner, 2026-11-15)
+            target = RelevanceTarget.From(u);
+            tree.Invalidate();
+            ShowDetail();
             if (u == null)
             {
                 int n = userCombo.Items.Count - 1;

@@ -96,7 +96,9 @@ merge to `main` and tag (`v2-m1`, …).
 2. **V2-M2 Tree-grid with Modified and Size.** Owner-drawn tree-grid, files under opened
    folders, background scan. UI smoke scenario updated.
 3. **V2-M3 Relevance score and Advice.** Scoring engine and known-app catalog in the core
-   library; tests with generated trees whose files are owned by different test accounts.
+   library; tests with generated trees and simulated owners (no test accounts, see
+   DECISIONS.md). Also: files get their own tick box (owner, 2026-11-15), and a ticked
+   profile shows its AppData unticked, as it is not copied.
 4. **V2-M4 Report, manual tests, release.** Report lists the user each source was scored
    for; manual tests T20 (two real users, standard and admin, plus a domain user) and T21
    (catalog paths on a PC with the apps installed); release `v2.0.0`.
