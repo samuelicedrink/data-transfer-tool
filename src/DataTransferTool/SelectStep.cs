@@ -7,10 +7,23 @@ using DataTransfer.Core;
 
 namespace DataTransferTool
 {
-    /// <summary>Screen 1: lazy folder tree with tri-state check boxes and the "User data" preset.</summary>
+    /// <summary>
+    /// Screen 1: lazy folder tree with tri-state check boxes and the "User data" preset. v2: the
+    /// tree is a tree-grid with Modified and Size columns, opened folders also list their files,
+    /// and sizes come from a background scan.
+    /// </summary>
     internal sealed class SelectStep : StepControl
     {
-        readonly TreeView tree = new TreeView { Name = "folderTree", Dock = DockStyle.Fill, HideSelection = false, ShowNodeToolTips = true, ShowLines = true };
+        /// <summary>Files listed under one folder; the rest are counted in a "more files" line.</summary>
+        const int MaxFilesShown = 1000;
+        const string Waiting = "…";
+
+        readonly TreeGrid tree = new TreeGrid { Name = "folderTree", Dock = DockStyle.Fill, HideSelection = false, ShowNodeToolTips = true, ShowLines = true };
+        readonly Label detailLabel = new Label { Name = "detailLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = 40, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 4, 0, 0), UseMnemonic = false };
+        readonly Timer scanTimer = new Timer { Interval = 300 };
+        /// <summary>Folder rows still showing "…".</summary>
+        readonly System.Collections.Generic.HashSet<TreeNode> waiting = new System.Collections.Generic.HashSet<TreeNode>();
+        FolderScanner scanner;
         readonly ListBox selectionList = new ListBox { Name = "selectionList", Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
         readonly Label summaryLabel = new Label { Name = "summaryLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = 48, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 6, 0, 0) };
         readonly TextBox addPathBox = Ui.TextBox("addPathBox", 300);
@@ -45,8 +58,20 @@ namespace DataTransferTool
             right.Controls.Add(new Label { Text = "Will be copied (one Robocopy job each):", Dock = DockStyle.Top, AutoSize = true, Font = Ui.BoldFont, Padding = new Padding(0, 0, 0, 4) });
             right.Controls.Add(summaryLabel);
 
+            // tree-grid: names on the left, columns on the right
+            tree.Columns.Add(new GridColumn { Header = "Modified", Width = TextRenderer.MeasureText("2026-12-31 23:59", Font).Width + 16 });
+            tree.Columns.Add(new GridColumn { Header = "Size", Width = TextRenderer.MeasureText("1023.99 MB+", Font).Width + 16, Align = HorizontalAlignment.Right });
+            tree.CellText = CellText;
+            tree.NodeColor = tn => tn.Tag is FileItem f && f.CloudOnly || tn.Tag is string ? Ui.Muted : Color.Empty;
+            var grid = new Panel { Name = "gridPanel", Dock = DockStyle.Fill, BorderStyle = BorderStyle.FixedSingle };
+            grid.Controls.Add(tree);
+            grid.Controls.Add(new TreeGridHeader(tree, "Folder / file"));
+            var left = new Panel { Dock = DockStyle.Fill };
+            left.Controls.Add(grid);
+            left.Controls.Add(detailLabel);
+
             var split = new SplitContainer { Dock = DockStyle.Fill, SplitterWidth = 6 };
-            split.Panel1.Controls.Add(tree);
+            split.Panel1.Controls.Add(left);
             split.Panel2.Controls.Add(right);
 
             // top left: whose data is being exported
@@ -60,10 +85,12 @@ namespace DataTransferTool
             Controls.Add(split);
             Controls.Add(bar);
             Controls.Add(userRow);
-            Ui.SplitAt(split, 0.58, 200);
+            Ui.SplitAt(split, 0.66, 200);
 
             tree.StateImageList = Ui.CheckImages(this);
             tree.BeforeExpand += (s, e) => Populate(e.Node);
+            tree.AfterSelect += (s, e) => ShowDetail();
+            scanTimer.Tick += (s, e) => ScanProgress();
             tree.NodeMouseClick += (s, e) =>
             {
                 if (e.Button == MouseButtons.Left && tree.HitTest(e.Location).Location == TreeViewHitTestLocations.StateImage) Toggle(e.Node);
@@ -97,10 +124,13 @@ namespace DataTransferTool
         {
             if (State.Tree != null) return;
             LoadUsers();
+            scanner = new FolderScanner(State.Job.Options.BackupMode);
+            scanTimer.Start();
             State.Tree = new FolderTree(FolderTree.FixedDrives());
             tree.BeginUpdate();
             foreach (var r in State.Tree.Roots) tree.Nodes.Add(NewNode(r));
             tree.EndUpdate();
+            RequestScan(tree.Nodes);
             if (State.Job.Sources.Count > 0) State.Tree.Apply(State.Job.Sources);
             Refresh(null);
         }
@@ -121,7 +151,7 @@ namespace DataTransferTool
         TreeNode NewNode(FolderNode n)
         {
             var tn = new TreeNode(n.Name) { Tag = n, Name = n.Path };
-            if (!n.ChildrenLoaded || n.Children.Count > 0) tn.Nodes.Add(new TreeNode("...")); // placeholder until expanded
+            tn.Nodes.Add(new TreeNode("...")); // placeholder until expanded: the folder may hold files even without subfolders
             return tn;
         }
 
@@ -133,18 +163,24 @@ namespace DataTransferTool
             try
             {
                 var kids = State.Tree.EnsureChildren(n);
+                var files = FolderScanner.ListFiles(n.Path, MaxFilesShown);
                 tree.BeginUpdate();
                 tn.Nodes.Clear();
                 foreach (var c in kids) tn.Nodes.Add(NewNode(c));
+                foreach (var f in files.Files) tn.Nodes.Add(new TreeNode(f.Name) { Tag = f, Name = f.Path });
+                int more = files.TotalFiles - files.Files.Count;
+                if (more > 0) tn.Nodes.Add(new TreeNode($"... and {more:N0} more file(s), not listed here") { Tag = "more" });
                 if (n.LoadError != null) tn.ToolTipText = "Subfolders cannot be listed: " + n.LoadError;
                 RefreshImages(tn.Nodes);
                 tree.EndUpdate();
+                RequestScan(tn.Nodes);
             }
             finally { Cursor = Cursors.Default; }
         }
 
         void Toggle(TreeNode tn)
         {
+            if (tn.Tag is FileItem) { Message("Files are copied or left out with their folder: tick or untick the folder.", false); return; }
             if (!(tn.Tag is FolderNode n)) return;
             State.Tree.Toggle(n);
             Refresh(null);
@@ -154,11 +190,85 @@ namespace DataTransferTool
         {
             foreach (TreeNode tn in nodes)
             {
+                if (tn.Tag is FileItem)
+                {
+                    // a folder's own files are copied when the folder itself is ticked
+                    int fi = tn.Parent?.Tag is FolderNode p && p.Included ? 4 : 3;
+                    if (tn.StateImageIndex != fi) tn.StateImageIndex = fi;
+                    continue;
+                }
                 if (!(tn.Tag is FolderNode n)) continue;
                 int i = (int)State.Tree.State(n);
                 if (tn.StateImageIndex != i) tn.StateImageIndex = i;
-                if (tn.IsExpanded || tn.Nodes.Count > 1) RefreshImages(tn.Nodes);
+                if (!(tn.Nodes.Count == 1 && tn.Nodes[0].Tag == null)) RefreshImages(tn.Nodes); // skip only a bare placeholder
             }
+        }
+
+        // ------------------------------------------------------------ columns
+
+        void RequestScan(TreeNodeCollection nodes)
+        {
+            var paths = new System.Collections.Generic.List<string>();
+            foreach (TreeNode tn in nodes)
+                if (tn.Tag is FolderNode n && !scanner.TryGet(n.Path, out _)) { waiting.Add(tn); paths.Add(n.Path); }
+            scanner.Request(paths);
+        }
+
+        string CellText(TreeNode tn, int column)
+        {
+            if (tn.Tag is FileItem f) return column == 0 ? Date(f.ModifiedUtc) : GridSize(f.Size);
+            if (!(tn.Tag is FolderNode n)) return null;
+            if (scanner == null || !scanner.TryGet(n.Path, out var s)) return Waiting;
+            return column == 0 ? Date(s.NewestUtc) : GridSize(s.Bytes) + (s.UnreadableFolders > 0 ? "+" : "");
+        }
+
+        static string Date(DateTime? utc) => utc.HasValue ? utc.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "";
+
+        static string GridSize(long bytes) => bytes < 1024 ? bytes + " B" : Ui.Size(bytes);
+
+        /// <summary>Timer: repaints rows whose numbers have arrived.</summary>
+        void ScanProgress()
+        {
+            if (waiting.Count == 0 || scanner == null) return;
+            foreach (var tn in waiting.ToList())
+            {
+                if (tn.TreeView == null) { waiting.Remove(tn); continue; }
+                if (!scanner.TryGet(((FolderNode)tn.Tag).Path, out _)) continue;
+                waiting.Remove(tn);
+                tree.InvalidateRow(tn);
+                if (tn == tree.SelectedNode) ShowDetail();
+            }
+        }
+
+        /// <summary>The line under the tree: facts about the selected folder or file.</summary>
+        void ShowDetail()
+        {
+            var tn = tree.SelectedNode;
+            string text = "";
+            if (tn?.Tag is FileItem f)
+            {
+                text = $"{f.Path}: {Ui.Size(f.Size)}, modified {Date(f.ModifiedUtc)}." +
+                       (f.CloudOnly ? " Cloud-only (OneDrive keeps it online): counted, but not copied." : "") +
+                       " Files are copied or left out with their folder.";
+            }
+            else if (tn?.Tag is FolderNode n)
+            {
+                if (!scanner.TryGet(n.Path, out var s)) text = $"{PathUtil.Trim(n.Path)}: counting files {Waiting}";
+                else
+                {
+                    text = $"{PathUtil.Trim(n.Path)}: {s.Files:N0} file(s), {Ui.Size(s.Bytes)}" + (s.NewestUtc.HasValue ? $", newest {Date(s.NewestUtc)}." : ".");
+                    if (s.CloudFiles > 0) text += $" {s.CloudFiles:N0} cloud-only file(s) ({Ui.Size(s.CloudBytes)}) are counted but not copied.";
+                    if (s.UnreadableFolders > 0) text += $" {s.UnreadableFolders:N0} folder(s) inside cannot be read, so the size is at least this.";
+                }
+            }
+            else if (tn?.Tag is string) text = "Only the first " + MaxFilesShown.ToString("N0") + " files of a folder are listed; all of them are counted in its size and copied with it.";
+            detailLabel.Text = text;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) { scanTimer.Dispose(); scanner?.Dispose(); tips.Dispose(); }
+            base.Dispose(disposing);
         }
 
         /// <summary>Expands the tree down to a folder and selects it.</summary>

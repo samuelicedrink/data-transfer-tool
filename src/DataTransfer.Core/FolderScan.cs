@@ -75,15 +75,13 @@ namespace DataTransfer.Core
         /// <summary>Asks for folders to be scanned; the first one is served first. Ahead of every earlier request.</summary>
         public void Request(IEnumerable<string> folders)
         {
-            var list = folders.Select(Key).Where(f => !done.ContainsKey(f)).ToList();
+            var list = folders.Select(Key).Where(f => !done.ContainsKey(f)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (list.Count == 0) return;
+            var set = new HashSet<string>(list, StringComparer.OrdinalIgnoreCase);
             lock (pending)
             {
-                for (int i = list.Count - 1; i >= 0; i--)
-                {
-                    pending.RemoveAll(p => string.Equals(p, list[i], StringComparison.OrdinalIgnoreCase));
-                    pending.Add(list[i]);
-                }
+                pending.RemoveAll(set.Contains); // one pass: opening a folder with 20,000 subfolders stays quick
+                for (int i = list.Count - 1; i >= 0; i--) pending.Add(list[i]);
                 pendingCount = pending.Count;
             }
             signal.Set();

@@ -9,6 +9,7 @@
 // Scenario B: start a copy and cancel it with the two-click Cancel button.
 // Scenario C: start a copy and close the window: it must cancel and exit without any dialog.
 // Scenario G (v2): user picker lists this PC's users with access level; picking one ticks nothing.
+// Scenario H (v2): tree-grid: folder size and newest date, files listed under folders, "more files" line.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -36,7 +37,7 @@ static class Program
         Directory.CreateDirectory(shots);
         try
         {
-            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEFG"; // D resumes the job C leaves behind
+            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEFGH"; // D resumes the job C leaves behind
             if (only.Contains("A")) ScenarioA();
             if (only.Contains("B")) ScenarioB();
             if (only.Contains("C")) ScenarioC();
@@ -44,6 +45,7 @@ static class Program
             if (only.Contains("E")) ScenarioE();
             if (only.Contains("F")) ScenarioF();
             if (only.Contains("G")) ScenarioG();
+            if (only.Contains("H")) ScenarioH();
         }
         catch (Exception ex) { Fail("crashed: " + ex); Shot("error"); }
         finally { try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { } }
@@ -375,6 +377,63 @@ static class Program
 
         for (int i = 0; i < idx; i++) { PostMessage(h, 0x0100, new IntPtr(0x26), new IntPtr(0x01480001)); PostMessage(h, 0x0101, new IntPtr(0x26), new IntPtr(unchecked((int)0xC1480001))); }
         Check(WaitFor(() => Text("accessLabel").EndsWith("user(s) have signed in on this PC."), 10), "back to All users");
+        proc.Kill(); proc.WaitForExit(5000);
+    }
+
+    static void ScenarioH()
+    {
+        Console.WriteLine("== H: tree-grid with Modified and Size");
+        // a generated folder with more files than the tree lists
+        string wide = Path.Combine(work, "ui_wide");
+        if (!Directory.Exists(wide) || Directory.GetFiles(wide).Length != 1200)
+        {
+            Wipe(wide);
+            Directory.CreateDirectory(wide);
+            for (int i = 0; i < 1200; i++) File.WriteAllBytes(Path.Combine(wide, $"w{i:0000}.txt"), new byte[10]);
+        }
+        Launch();
+        var tree = Id("folderTree");
+
+        // folder numbers: the small tree's size and newest date, as a walk that skips junctions finds them
+        TickFolder(small);
+        var files = Walk(small).Select(f => new FileInfo(f)).ToList();
+        string expected = $"{small}: {files.Count:N0} file(s), ";
+        string newest = files.Max(f => f.LastWriteTime).ToString("yyyy-MM-dd HH:mm");
+        Check(WaitFor(() => Text("detailLabel").StartsWith(expected), 60), "folder line counts the files: " + First(Text("detailLabel")));
+        Check(Text("detailLabel").Contains(", newest " + newest + "."), "folder line shows the newest file's date " + newest);
+
+        // opening a folder lists its files under the subfolders
+        var smallItem = TreeItem(tree, Path.GetFileName(small));
+        Expand(smallItem);
+        var docs = TreeItem(smallItem, "Docs");
+        Expand(docs);
+        var first = new DirectoryInfo(Path.Combine(small, "Docs")).GetFiles().OrderBy(f => f.Name, StringComparer.CurrentCultureIgnoreCase).First();
+        var fileItem = TreeItem(docs, first.Name);
+        Check(fileItem != null, "files are listed under their folder: " + first.Name);
+        ((SelectionItemPattern)fileItem.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Check(WaitFor(() => Text("detailLabel").StartsWith(first.FullName + ": ") && Text("detailLabel").Contains("modified " + first.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), 10),
+              "file line shows size and modified date: " + First(Text("detailLabel")));
+
+        // a file has no tick box of its own
+        int jobs = Items("selectionList").Count;
+        PressSpace(tree);
+        Check(WaitFor(() => Text("messageLabel").StartsWith("Files are copied or left out with their folder"), 5), "Space on a file explains that files follow their folder");
+        Check(Items("selectionList").Count == jobs && Items("selectionList").Contains(small), "selection unchanged");
+
+        var sub = TreeItem(docs, "Sub");
+        ((SelectionItemPattern)sub.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Check(WaitFor(() => Text("detailLabel").StartsWith(Path.Combine(small, "Docs", "Sub") + ": "), 10), "subfolder numbers are ready at once (kept from the parent's scan)");
+        Shot("h-tree-grid");
+
+        // a folder with more files than the tree lists
+        TickFolder(wide);
+        var wideItem = TreeItem(tree, Path.GetFileName(wide));
+        Expand(wideItem);
+        var more = TreeItem(wideItem, "... and 200 more file(s), not listed here");
+        Check(more != null, "1,200 files: the first 1,000 listed, the rest counted");
+        ((SelectionItemPattern)wideItem.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+        Check(WaitFor(() => Text("detailLabel").StartsWith($"{wide}: 1,200 file(s), 11.72 KB"), 20), "the folder line counts all 1,200: " + First(Text("detailLabel")));
+        Shot("h-many-files");
         proc.Kill(); proc.WaitForExit(5000);
     }
 

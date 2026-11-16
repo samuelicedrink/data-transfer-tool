@@ -16,6 +16,8 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 - Select step: **User** picker at the top left ("All users" first, then signed-in users first and most recent sign-in next), each entry with its access level; the line beside it shows access and sign-in, the tooltip the profile folder. Picking a user ticks nothing; it only sets whose data the relevance estimate is for (owner, 2026-11-15). *Tick user data* still ticks every profile, as in v1. A SID is never shown: a group without a name reads "a Microsoft Entra group" or "a group whose name cannot be looked up". The list loads in the background. The picked user is saved in the job as a SID only (V2-M1).
 - UI smoke scenario G: user list loads, current user listed with the access level Windows reports, picking a user ticks nothing, no SID on screen, *Tick user data* still covers every profile, back to All users. Combo items are read with `CB_GETLBTEXT` so no dropdown opens on the desktop.
 - Core: `FolderScanner` works out each folder's size, file count and newest modified date in the background, for the v2 Modified and Size columns. The newest request is served first and interrupts a long scan (which carries on afterwards); results are kept so subfolders are instant. Junctions are not followed (as `/XJ`), cloud-only files are counted and marked, folders that cannot be listed are counted so the size reads as a minimum. `ListFiles` lists a folder's own files (sorted, capped). Read-only; no file is opened (V2-M2).
+- Select step: the folder tree is a tree-grid with **Modified** (newest file inside a folder) and **Size** (everything inside) columns, filled by the background scan; rows show `…` until their numbers arrive and the screen never waits for them. Opening a folder also lists its files (first 1,000 by name; a line counts the rest) with their own date and size. Files have a greyed box that follows their folder: they are copied or left out with it (Space on a file says so). A line under the tree gives the selected item's numbers, cloud-only files and unreadable folders (size then shown with `+`). It is the native tree view with the names and columns drawn by the tool, so keyboard use, tick boxes and UI Automation work as in v1 (V2-M2).
+- UI smoke scenario H: folder line matches a walk of the generated tree (file count, newest date), files listed under their folder with size and date, Space on a file changes nothing, subfolder numbers instant, a generated folder of 1,200 files lists 1,000 and counts all.
 
 ### Test findings (V2-M1, 2026-11-15, not elevated)
 
@@ -23,6 +25,7 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Changed
 
+- The folder tree shows a collapsed folder's tick state correctly when it has exactly one loaded child (it was only refreshed for folders with two or more) (V2-M2).
 - v2 keeps its job and credential files under `%ProgramData%\DataTransferTool\v2` when the exe's folder is read-only, so v1 and v2 never resume each other's job (V2-M1).
 
 ### Fixed
