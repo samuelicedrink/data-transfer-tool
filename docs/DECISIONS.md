@@ -8,6 +8,22 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-16 — v1.0.3: copies are visible; one log folder per job, copied to the destination
+
+- After a real-life test the owner found the copied folder hidden in Explorer even with hidden
+  items shown: Robocopy gives a destination folder its source's attributes, and a drive root is
+  Hidden + System. Now nothing at the destination is left Hidden or System (`/A-:SH` for files,
+  the tool clears folders after each folder job). Deviation from the M1 flag set. An Options box
+  keeps the old behaviour.
+- The owner asked for fewer log files and for logs per job at the destination. Agreed design
+  (owner, "build it your way"): one folder per job; copy, retry and scan runs each append to one
+  file; written next to the tool during the run (a lost or full destination must not stop Robocopy
+  or lose the logs) and copied to `<Destination>\Transfer logs\` when a run ends and at close.
+  Deviation from SPEC.md, which put every log loose in `Logs\`.
+- Earlier the same day (v1.0.2): each failure in the CSV names its Robocopy log file and line.
+- Released as `v1.0.3` in `release\v1.0.3\`; `release\v1\` keeps v1.0.2 (owner, 2026-11-16).
+  The UI smoke was not re-run after merging the two changes, at the owner's request.
+- Who: owner.
 ## 2026-11-15 — Owner approved M6; current tool becomes v1, new design starts as v2
 
 - The owner asked to keep the current tool as **v1** and to start the new

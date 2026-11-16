@@ -9,7 +9,7 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-11-15
+## [1.0.3] - 2026-11-16
 
 ### Fixed
 
@@ -17,6 +17,8 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Added
 
+- **One log folder per job**, asked for by the owner after a real-life test that left about 95 log files in one folder. Each job writes to `Logs\<COMPUTERNAME> <yyyy-MM-dd HHmm> <job id>\` next to the tool, and every kind of Robocopy run appends to one file there: `copy.log` (main pass of every folder job), `retry.log` (locked-file retry and *Retry failed*), `scan.log` (pre-flight scans), next to `failures.csv` and, once the job is closed, `job.json`. The CSV's *Log file* and *Log line* columns point into these combined files. A resumed job keeps its folder.
+- **Logs copied to the destination**: when a run ends, after *Retry failed* and when the tool is closed, the job's log folder is copied to `<Destination>\Transfer logs\<same name>\`, so each job's logs sit with its copy. The logs are written next to the tool while copying, so a destination that is lost or full cannot stop Robocopy or lose them; if the destination cannot be reached at the end, the report says where they are. *Open log folder* opens the job's own folder.
 - Options: *Make copied files and folders visible* (on by default). Switching it off copies the Hidden and System attributes as v1.0.0 to v1.0.2 did.
 
 ### Changed
@@ -26,6 +28,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 ### Test findings (v1.0.3, 2026-11-15, not elevated)
 
 - Reproduced on a generated tree whose top folder is Hidden + System: the old flags leave the destination folder Hidden + System; `/A-:SH` fixes files only; a second Robocopy run puts a folder's attributes back, so the tool clears them after every run.
+- Robocopy `/UNILOG+` writes a new log as ANSI (non-Latin file names garbled); the tool now creates each log with a UTF-16 byte order mark first, after which Robocopy appends in UTF-16. Checked on a generated tree with Japanese and accented names.
+- 88 unit tests: 86 pass, 2 skipped (elevated-only). New: appending and line numbering across runs, one folder per job, copying to the destination (and an unreachable one reported), the locked-file log entry found at the line the CSV names inside `retry.log`.
+- UI smoke A to F passed on the visible-attributes branch (apart from two false alarms from Windows' input indicator windows, since excluded). After merging the log change only the unit tests were run; the UI smoke was not run again at the owner's request (2026-11-16), as the owner is testing on a real PC.
+- The UI smoke can now run on a desktop of its own (`DTT_SMOKE_QUIET=1`): UI Automation's Invoke and SetValue moved the focus with a simulated key press, which took the keyboard of the person using the PC. Test-only; the Release exe is unchanged.
 - New engine test: hidden and system files and folders arrive visible, Read-only kept, source unchanged, a second run copies nothing and stays visible, an old hidden destination is repaired, and the option off keeps the attributes.
 
 ## [1.0.2] - 2026-11-15

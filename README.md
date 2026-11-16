@@ -25,7 +25,7 @@ The tool is the single file `DataTransferTool.exe` (built at `src\DataTransferTo
 
 If a copy is cancelled, the destination fills up, or the PC restarts, start the tool again from the same stick: it offers to resume the job. For a network share, tick *Save credentials for resume* so the password does not have to be typed again (it is stored encrypted, readable only by the same Windows account on the same PC).
 
-The job file (`DataTransferJob.json`) and logs (`Logs\`) are written next to the exe, or under `%ProgramData%\DataTransferTool` when that folder is read-only.
+The job file (`DataTransferJob.json`) and logs are written next to the exe, or under `%ProgramData%\DataTransferTool` when that folder is read-only. Each job has its own log folder, `Logs\<COMPUTERNAME> <date time> <id>\` (`copy.log`, `retry.log`, `scan.log`, `failures.csv`, `job.json`), which is also copied to `<Destination>\Transfer logs\` when a run ends.
 
 ## Repository layout
 
