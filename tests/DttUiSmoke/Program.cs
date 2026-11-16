@@ -716,7 +716,8 @@ static class Program
     {
         var found = new List<string>();
         foreach (AutomationElement e in AutomationElement.RootElement.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ProcessIdProperty, proc.Id)))
-            if (e.Current.NativeWindowHandle != win.Current.NativeWindowHandle) found.Add($"top-level \"{e.Current.Name}\" ({e.Current.ClassName}, {e.Current.ControlType.ProgrammaticName})");
+            // Windows' own keyboard-language indicator, which it adds on a desktop of its own, is not the tool's
+            if (e.Current.NativeWindowHandle != win.Current.NativeWindowHandle && !e.Current.ClassName.StartsWith("UAC_InputIndicator") && e.Current.ClassName != "UAC Input Indicator") found.Add($"top-level \"{e.Current.Name}\" ({e.Current.ClassName}, {e.Current.ControlType.ProgrammaticName})");
         foreach (AutomationElement e in win.FindAll(TreeScope.Children, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window)))
             found.Add($"owned \"{e.Current.Name}\" ({e.Current.ClassName})");
         return found;
