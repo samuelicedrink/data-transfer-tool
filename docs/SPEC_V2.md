@@ -37,7 +37,11 @@ its score.
 
 - Sizes, dates and scores come from a background scan and show "…" until ready. Folders the
   technician opens are scanned first; the screen never freezes.
-- WinForms has no tree with columns, so the list is an owner-drawn tree-grid.
+- WinForms has no tree with columns, so the list is a tree-grid: the native tree view with the
+  names and columns drawn by the tool (keyboard use, tick boxes and UI Automation as in v1).
+- Files follow their folder (greyed box): they are copied or left out with it. Whether files
+  get tick boxes of their own is an open question for the owner (DECISIONS.md, V2-M2).
+- A folder lists its first 1,000 files by name; a line counts the rest. All are in its size.
 - Cloud-only OneDrive files are counted but marked, as in v1 (they are not copied).
 
 ## 3. Relevance score

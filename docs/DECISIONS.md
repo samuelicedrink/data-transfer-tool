@@ -8,6 +8,31 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — V2-M2 design choices (to be reviewed by the owner)
+
+- **Tree-grid built on the native tree view.** The names and the Modified and Size columns are
+  drawn by the tool on the right of each row; tick boxes, keyboard use, lazy loading and UI
+  Automation stay those of the v1 tree. A fully custom-drawn grid would have to rebuild all of
+  that. Why: less risk, and the smoke tests keep driving the tree as before.
+- **Files have no tick box of their own (open question).** Files are listed with a greyed box
+  that follows their folder: a folder's own files are copied when the folder is ticked, which
+  is how the copy works today (one Robocopy job per ticked folder, unticked subfolders `/XD`).
+  Unticking single files is possible with Robocopy (`/XF` with full paths) but changes the
+  selection model and the report, so it is not done without the owner's answer. If wanted, it
+  fits V2-M3, next to the per-file relevance score.
+- **First 1,000 files listed per folder**, the rest counted in a line under them; the folder's
+  size includes all of them. Why: a folder with tens of thousands of files would otherwise make
+  the tree slow to open.
+- **Background scan, newest request first.** One low-priority thread; a folder the technician
+  opens interrupts a long scan (such as the whole of `C:\`), which carries on afterwards.
+  Results are kept, so subfolders of a scanned folder are instant. Junctions are not followed
+  (as `/XJ`); cloud-only files are counted and named in the line under the tree; folders that
+  cannot be read make the size a minimum (shown with `+`). The scan uses the backup privilege
+  when backup mode is on and the tool is elevated, as Robocopy `/B` does. Read-only; no file
+  is opened.
+- **Folder Modified = newest file anywhere inside**, as the spec says; an empty folder shows no
+  date.
+
 ## 2026-11-15 — Owner approved V2-M1
 
 - V2-M1 (user picker) merged into `main` and tagged `v2-m1`. V2-M2 (tree-grid with

@@ -23,6 +23,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 - 65 unit tests pass (10 new: access level via fakes for direct admin, domain group, unreachable domain, Microsoft Entra offline, Everyone in Administrators, unreadable Administrators, sessions and order, deleted account; plus two read-only checks on this PC against `whoami /groups`). UI smoke A to G pass.
 
+### Test findings (V2-M2, 2026-11-15, not elevated)
+
+- 99 unit tests: 97 pass, 2 skipped (the existing elevated-only tests). 5 new for the folder scan on generated trees: size and newest date with a junction left out, an unreadable folder counted (denied with `icacls`, removed afterwards), a parent requested while its child is being scanned, a newer request overtaking a long scan, and the file listing (sorted, capped, no subfolders). UI smoke A to H pass.
+- Screenshot review: a name containing `&` was cut short because the tree view measures it narrower than it is drawn; names are now measured by the tool.
+
 ### Changed
 
 - v2 keeps its job and credential files under `%ProgramData%\DataTransferTool\v2` when the exe's folder is read-only, so v1 and v2 never resume each other's job (V2-M1).
