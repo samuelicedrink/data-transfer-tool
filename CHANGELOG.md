@@ -25,11 +25,11 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Changed
 
-- The folder tree shows a collapsed folder's tick state correctly when it has exactly one loaded child (it was only refreshed for folders with two or more) (V2-M2).
 - v2 keeps its job and credential files under `%ProgramData%\DataTransferTool\v2` when the exe's folder is read-only, so v1 and v2 never resume each other's job (V2-M1).
 
 ### Fixed
 
+- Folder tree: a collapsed folder with exactly one loaded subfolder kept a stale tick box on that subfolder after ticking or unticking (only folders with two or more children were refreshed). Found while building V2-M2; v1 has the same bug.
 - `scripts\Build-Release.ps1` stopped at `git worktree add` under Windows PowerShell 5.1, which treats git's progress messages as errors; it now checks git's exit code instead.
 
 ## [1.0.0] - 2026-11-15
