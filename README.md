@@ -17,7 +17,7 @@ The tool is the single file `DataTransferTool.exe` (built at `src\DataTransferTo
 
 1. Copy `DataTransferTool.exe` to a USB stick.
 2. On the PC to export, double-click it and accept the administrator prompt.
-3. **Select:** tick folders, or press *Tick user data* for Desktop, Documents, Pictures and Downloads of every profile.
+3. **Select:** tick folders, or press *Tick user data* for Desktop, Documents, Pictures and Downloads of every profile. In v2, the **User** list at the top left shows everyone who has signed in on this PC with their access level (Local admin, Standard user, or unknown with the reason) and whether they are signed in now. Picking a user ticks nothing: it only tells the tool whose data to estimate relevance for. *Tick user data* still covers every profile.
 4. **Destination:** a folder on a USB or local drive, or a network share with user name and password. Press *Test destination*.
 5. **Pre-flight:** fix or acknowledge every warning, then *Start copy*.
 6. **Run:** wait for *Finished*. Files land in `<destination>\<COMPUTERNAME>\<drive>\<original path>`.
@@ -25,7 +25,7 @@ The tool is the single file `DataTransferTool.exe` (built at `src\DataTransferTo
 
 If a copy is cancelled, the destination fills up, or the PC restarts, start the tool again from the same stick: it offers to resume the job. For a network share, tick *Save credentials for resume* so the password does not have to be typed again (it is stored encrypted, readable only by the same Windows account on the same PC).
 
-The job file (`DataTransferJob.json`) and logs (`Logs\`) are written next to the exe, or under `%ProgramData%\DataTransferTool` when that folder is read-only.
+The job file (`DataTransferJob.json`) and logs (`Logs\`) are written next to the exe, or under `%ProgramData%\DataTransferTool` (v1) or `%ProgramData%\DataTransferTool\v2` (v2) when that folder is read-only. Each version keeps its own job, so v1 and v2 never resume each other's copy.
 
 ## Repository layout
 

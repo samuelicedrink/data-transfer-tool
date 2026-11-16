@@ -9,6 +9,21 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+### Added
+
+- v2 started: `docs/SPEC_V2.md` describes the Select-screen redesign (user picker with access level; Modified, Size, Relevant and Advice columns) and its milestones V2-M1 to V2-M4. Exe version 2.0.0-alpha.
+- Core: `UserDirectory` lists the people who have signed in on this PC (profile list; system profiles and profiles whose folder is gone left out) with account name, last sign-in (profile load time, else `NTUSER.DAT` time), signed in now (Remote Desktop session list) and access level: Local admin (direct, or via a named group such as a domain group), Standard user, or Access unknown with the reason (domain not reachable, Microsoft Entra groups offline, Administrators group unreadable). Membership is read with the AuthZ API; nothing is guessed (V2-M1).
+- Select step: **User** picker at the top left ("All users" first, then signed-in users first and most recent sign-in next), each entry with its access level; the line beside it shows access and sign-in, the tooltip the profile folder. Picking a user ticks nothing; it only sets whose data the relevance estimate is for (owner, 2026-11-15). *Tick user data* still ticks every profile, as in v1. A SID is never shown: a group without a name reads "a Microsoft Entra group" or "a group whose name cannot be looked up". The list loads in the background. The picked user is saved in the job as a SID only (V2-M1).
+- UI smoke scenario G: user list loads, current user listed with the access level Windows reports, picking a user ticks nothing, no SID on screen, *Tick user data* still covers every profile, back to All users. Combo items are read with `CB_GETLBTEXT` so no dropdown opens on the desktop.
+
+### Test findings (V2-M1, 2026-11-15, not elevated)
+
+- 65 unit tests pass (10 new: access level via fakes for direct admin, domain group, unreachable domain, Microsoft Entra offline, Everyone in Administrators, unreadable Administrators, sessions and order, deleted account; plus two read-only checks on this PC against `whoami /groups`). UI smoke A to G pass.
+
+### Changed
+
+- v2 keeps its job and credential files under `%ProgramData%\DataTransferTool\v2` when the exe's folder is read-only, so v1 and v2 never resume each other's job (V2-M1).
+
 ### Fixed
 
 - `scripts\Build-Release.ps1` stopped at `git worktree add` under Windows PowerShell 5.1, which treats git's progress messages as errors; it now checks git's exit code instead.

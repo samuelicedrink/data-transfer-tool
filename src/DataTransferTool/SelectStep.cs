@@ -15,6 +15,16 @@ namespace DataTransferTool
         readonly Label summaryLabel = new Label { Name = "summaryLabel", Dock = DockStyle.Bottom, AutoSize = false, Height = 48, AutoEllipsis = true, ForeColor = Ui.Muted, Padding = new Padding(0, 6, 0, 0) };
         readonly TextBox addPathBox = Ui.TextBox("addPathBox", 300);
         readonly Label messageLabel = new Label { Name = "messageLabel", AutoSize = true, Margin = new Padding(3, 7, 3, 3) };
+        readonly ComboBox userCombo = new ComboBox { Name = "userCombo", DropDownStyle = ComboBoxStyle.DropDownList, Width = 340, Margin = new Padding(3, 4, 3, 3) };
+        readonly Label accessLabel = new Label { Name = "accessLabel", AutoSize = true, Margin = new Padding(3, 7, 3, 3) };
+        readonly ToolTip tips = new ToolTip();
+
+        /// <summary>An entry of the user picker; User is null for "All users".</summary>
+        sealed class UserItem
+        {
+            public SignedInUser User;
+            public override string ToString() => User == null ? "All users" : $"{User.Account}  ({User.AccessText})";
+        }
         int sourceCount;
 
         public SelectStep(AppState state) : base(state)
@@ -24,7 +34,8 @@ namespace DataTransferTool
             var add = Ui.Button("addPathButton", "Tick");
             var browse = Ui.Button("browseButton", "Browse...");
             var options = Ui.Button("optionsButton", "Options...");
-            new ToolTip().SetToolTip(userData, "Ticks Desktop, Documents, Pictures and Downloads of every user profile on this PC.");
+            tips.SetToolTip(userData, "Ticks Desktop, Documents, Pictures and Downloads of every user profile on this PC.");
+            tips.SetToolTip(userCombo, "Whose data this is. Used to estimate how relevant each folder is to that user; it does not tick anything.");
 
             var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, 6) };
             bar.Controls.AddRange(new Control[] { userData, clear, Ui.Label("Folder:"), addPathBox, add, browse, options, messageLabel });
@@ -37,8 +48,18 @@ namespace DataTransferTool
             var split = new SplitContainer { Dock = DockStyle.Fill, SplitterWidth = 6 };
             split.Panel1.Controls.Add(tree);
             split.Panel2.Controls.Add(right);
+
+            // top left: whose data is being exported
+            var userRow = new FlowLayoutPanel { Name = "userRow", Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, 4) };
+            userRow.Controls.AddRange(new Control[] { Ui.Label("User:", bold: true), userCombo, accessLabel });
+            userCombo.Items.Add("Loading users...");
+            userCombo.SelectedIndex = 0;
+            userCombo.Enabled = false;
+            userCombo.SelectedIndexChanged += (s, e) => UserChanged();
+
             Controls.Add(split);
             Controls.Add(bar);
+            Controls.Add(userRow);
             Ui.SplitAt(split, 0.58, 200);
 
             tree.StateImageList = Ui.CheckImages(this);
@@ -75,6 +96,7 @@ namespace DataTransferTool
         public override void OnEnter()
         {
             if (State.Tree != null) return;
+            LoadUsers();
             State.Tree = new FolderTree(FolderTree.FixedDrives());
             tree.BeginUpdate();
             foreach (var r in State.Tree.Roots) tree.Nodes.Add(NewNode(r));
@@ -178,11 +200,11 @@ namespace DataTransferTool
             var folders = UserDataPreset.Folders(State.Profiles);
             int ticked = folders.Count(State.Tree.Include);
             string usersDir = State.Profiles.ProfilesDirectory.TrimEnd('\\') + "\\";
-            int profiles = folders.Where(f => f.StartsWith(usersDir, StringComparison.OrdinalIgnoreCase))
+            int count = folders.Where(f => f.StartsWith(usersDir, StringComparison.OrdinalIgnoreCase))
                                   .Select(f => f.Substring(usersDir.Length).Split('\\')[0])
                                   .Distinct(StringComparer.OrdinalIgnoreCase).Count();
             if (folders.Count > 0) Reveal(State.Profiles.ProfilesDirectory);
-            Refresh(ticked == 0 ? "No user folders found." : $"Ticked {ticked} folder(s) in {profiles} profile(s).");
+            Refresh(ticked == 0 ? "No user folders found." : $"Ticked {ticked} folder(s) in {count} profile(s).");
         }
 
         void Refresh(string message)
@@ -201,6 +223,58 @@ namespace DataTransferTool
                 $"{sources.Count} folder job(s). Skipped everywhere: {string.Join(", ", State.Job.Options.ExcludeFiles)}; and {string.Join(", ", State.Job.Options.ExcludeProfileDirs)} in each profile.";
             if (message != null) Message(message, false);
             RaiseButtonsChanged();
+        }
+
+        // ------------------------------------------------------------ user picker
+
+        void LoadUsers()
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try { return UserDirectory.List(new SystemAccountSource()); }
+                catch { return new System.Collections.Generic.List<SignedInUser>(); }
+            }).ContinueWith(t =>
+            {
+                if (IsDisposed || !IsHandleCreated) return;
+                BeginInvoke((Action)(() => ShowUsers(t.Result)));
+            });
+        }
+
+        void ShowUsers(System.Collections.Generic.List<SignedInUser> users)
+        {
+            userCombo.BeginUpdate();
+            userCombo.Items.Clear();
+            userCombo.Items.Add(new UserItem());
+            foreach (var u in users) userCombo.Items.Add(new UserItem { User = u });
+            userCombo.EndUpdate();
+            int pick = 0;
+            for (int i = 1; i < userCombo.Items.Count; i++)
+                if (((UserItem)userCombo.Items[i]).User.Sid == State.Job.SelectedUserSid) pick = i;
+            userCombo.Enabled = true;
+            userCombo.SelectedIndex = pick;
+            using (var g = userCombo.CreateGraphics())
+                userCombo.DropDownWidth = Math.Max(userCombo.Width, userCombo.Items.Cast<object>().Max(o => (int)g.MeasureString(o.ToString(), userCombo.Font).Width) + 30);
+            UserChanged();
+        }
+
+        void UserChanged()
+        {
+            if (!(userCombo.SelectedItem is UserItem item)) { accessLabel.Text = ""; return; }
+            var u = item.User;
+            State.Job.SelectedUserSid = u?.Sid;
+            if (u == null)
+            {
+                int n = userCombo.Items.Count - 1;
+                accessLabel.Text = n == 0 ? "No user profiles found." : $"{n} user(s) have signed in on this PC.";
+                accessLabel.ForeColor = Ui.Muted;
+                tips.SetToolTip(accessLabel, null);
+            }
+            else
+            {
+                accessLabel.Text = $"{u.AccessText}  -  {u.SignInText}";
+                accessLabel.ForeColor = u.Access == AccessLevel.Unknown ? Ui.Warning : SystemColors.ControlText;
+                tips.SetToolTip(accessLabel, "Profile folder: " + u.ProfilePath + (u.AccountFound ? "" : "\r\nThe account no longer exists or cannot be looked up."));
+            }
         }
 
         void Message(string text, bool error)

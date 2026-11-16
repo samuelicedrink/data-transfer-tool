@@ -8,6 +8,7 @@
 //             destination test, acknowledge warnings, copy both sources, verify the copy.
 // Scenario B: start a copy and cancel it with the two-click Cancel button.
 // Scenario C: start a copy and close the window: it must cancel and exit without any dialog.
+// Scenario G (v2): user picker lists this PC's users with access level; picking one ticks nothing.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -35,13 +36,14 @@ static class Program
         Directory.CreateDirectory(shots);
         try
         {
-            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEF"; // D resumes the job C leaves behind
+            string only = Environment.GetEnvironmentVariable("DTT_SMOKE_ONLY") ?? "ABCDEFG"; // D resumes the job C leaves behind
             if (only.Contains("A")) ScenarioA();
             if (only.Contains("B")) ScenarioB();
             if (only.Contains("C")) ScenarioC();
             if (only.Contains("D")) ScenarioD();
             if (only.Contains("E")) ScenarioE();
             if (only.Contains("F")) ScenarioF();
+            if (only.Contains("G")) ScenarioG();
         }
         catch (Exception ex) { Fail("crashed: " + ex); Shot("error"); }
         finally { try { if (proc != null && !proc.HasExited) proc.Kill(); } catch { } }
@@ -337,6 +339,67 @@ static class Program
         {
             foreach (var f in new[] { jobFile, credFile }) if (File.Exists(f)) File.Delete(f);
         }
+    }
+
+    static void ScenarioG()
+    {
+        Console.WriteLine("== G: user picker");
+        Launch();
+        var combo = Id("userCombo");
+        Check(WaitFor(() => combo.Current.IsEnabled, 60), "user list loads");
+        var names = ComboItems(combo);
+        Check(names.Count >= 2 && names[0] == "All users", $"\"All users\" first, then {names.Count - 1} user(s)");
+        Check(Text("accessLabel").EndsWith("user(s) have signed in on this PC."), "All users summary: " + Text("accessLabel"));
+
+        string me = System.Security.Principal.WindowsIdentity.GetCurrent().Name;
+        int idx = names.FindIndex(n => n.StartsWith(me + "  (", StringComparison.OrdinalIgnoreCase));
+        Check(idx > 0, "current user is in the list");
+        if (idx <= 0) { proc.Kill(); return; }
+        bool admin = WhoamiHasAdministrators();
+        string expected = admin ? "Local admin" : "Standard user";
+        Check(names[idx] == me + "  (" + expected + ")" || names[idx].StartsWith(me + "  (" + expected, StringComparison.OrdinalIgnoreCase), "entry shows the access level: " + expected);
+
+        var h = new IntPtr(combo.Current.NativeWindowHandle);
+        for (int i = 0; i < idx; i++) { PostMessage(h, 0x0100, new IntPtr(0x28), new IntPtr(0x01500001)); PostMessage(h, 0x0101, new IntPtr(0x28), new IntPtr(unchecked((int)0xC1500001))); }
+        Check(WaitFor(() => Text("accessLabel").StartsWith(expected) && Text("accessLabel").Contains("signed in now"), 10), "picking the user shows access and \"signed in now\": " + Text("accessLabel"));
+
+        Thread.Sleep(500);
+        Check(Items("selectionList").Count == 0, "picking a user ticks nothing");
+        Check(!names.Any(n => n.Contains("S-1-")) && !Text("accessLabel").Contains("S-1-"), "no SID shown");
+        Invoke(Id("userDataButton"));
+        Thread.Sleep(800);
+        string msg = Text("messageLabel");
+        Check(msg == "No user folders found." || (msg.StartsWith("Ticked ") && msg.EndsWith(" profile(s).")), "Tick user data still covers every profile: " + msg);
+        Shot("g-user-picker");
+        Invoke(Id("clearButton"));
+
+        for (int i = 0; i < idx; i++) { PostMessage(h, 0x0100, new IntPtr(0x26), new IntPtr(0x01480001)); PostMessage(h, 0x0101, new IntPtr(0x26), new IntPtr(unchecked((int)0xC1480001))); }
+        Check(WaitFor(() => Text("accessLabel").EndsWith("user(s) have signed in on this PC."), 10), "back to All users");
+        proc.Kill(); proc.WaitForExit(5000);
+    }
+
+    /// <summary>Items of a collapsed combo box, read with CB_GETCOUNT / CB_GETLBTEXT (no dropdown opened).</summary>
+    static List<string> ComboItems(AutomationElement combo)
+    {
+        var h = new IntPtr(combo.Current.NativeWindowHandle);
+        int n = (int)SendMessage(h, 0x0146 /* CB_GETCOUNT */, IntPtr.Zero, IntPtr.Zero);
+        var list = new List<string>();
+        for (int i = 0; i < n; i++)
+        {
+            int len = (int)SendMessage(h, 0x0149 /* CB_GETLBTEXTLEN */, new IntPtr(i), IntPtr.Zero);
+            var sb = new System.Text.StringBuilder(Math.Max(len, 0) + 1);
+            SendMessage(h, 0x0148 /* CB_GETLBTEXT */, new IntPtr(i), sb);
+            list.Add(sb.ToString());
+        }
+        return list;
+    }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr SendMessage(IntPtr h, uint msg, IntPtr w, System.Text.StringBuilder l);
+
+    static bool WhoamiHasAdministrators()
+    {
+        var psi = new ProcessStartInfo("whoami", "/groups /fo csv /nh") { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+        using (var p = Process.Start(psi)) return p.StandardOutput.ReadToEnd().Contains("\"S-1-5-32-544\"");
     }
 
     static AutomationElement WaitForDialog(string id)

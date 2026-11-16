@@ -8,6 +8,35 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-15 — Owner approved V2-M1
+
+- V2-M1 (user picker) merged into `main` and tagged `v2-m1`. V2-M2 (tree-grid with
+  Modified and Size) starts on branch `v2-m2-tree-grid`.
+- Who: owner ("go").
+
+## 2026-11-15 — V2-M1 design choices (reviewed by the owner)
+
+- **Tests do not create Windows accounts.** The v2 spec said the unit tests would create
+  local accounts. Creating accounts on this PC needs the owner's permission, so the access
+  rules are tested against simulated accounts instead (direct admin, domain group, domain not
+  reachable, Microsoft Entra offline, Everyone in Administrators, unreadable Administrators
+  group, deleted account), and the real Windows calls are checked read-only against the
+  current user (`whoami /groups`). Real second users, a domain user and an Entra user are
+  left for the manual test T20. Owner agreed: no accounts are created.
+- **Account names only** (as Windows names them, e.g. `PC\anna`), not full names. Owner
+  agreed; the only rule is that a SID is never shown, so an unnamed group reads "a Microsoft
+  Entra group" or "a group whose name cannot be looked up".
+- **Picking a user ticks nothing** (owner, 2026-11-15). It only sets whose data the relevance
+  estimate is for. *Tick user data* still ticks every profile, as in v1. (A first version
+  narrowed *Tick user data* to the picked user; removed at the owner's request.)
+- **"Signed in now"** means a Windows session exists (console, fast user switching or Remote
+  Desktop); a session left disconnected says so. A profile loaded by a service is not counted.
+- **Access unknown is never guessed.** A local account can only be an admin through this
+  PC's own groups, so it always gets an answer; a domain or Entra account whose groups cannot
+  be read while such a group is in Administrators shows "Access unknown" with the reason.
+- The job file stores only the picked user's SID.
+- The window title shows `v2.0.0` (major.minor.patch); the `-alpha` suffix is in the file
+  version details only.
 ## 2026-11-15 — Owner approved M6; current tool becomes v1, new design starts as v2
 
 - The owner asked to keep the current tool as **v1** and to start the new
