@@ -9,6 +9,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+### Added
+
+- `LICENSE`: all rights reserved (owner, 2026-11-19). No use, copying, changes or sharing, and no business or for-profit use, without the owner's written permission; the public repository and its downloads do not grant any. README says so at the top.
+
 ## [1.0.3] - 2026-11-16
 
 ### Fixed

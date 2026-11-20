@@ -1,5 +1,7 @@
 # Data Transfer Tool
 
+> **All rights reserved.** Not for use, copying or any business use without the owner's written permission. See [LICENSE](LICENSE).
+
 A portable data-export tool for Windows 10 and Windows 11: a single `.exe` (C# WinForms, .NET Framework 4.8) that IT staff run from a USB stick to copy a user's selected folders to a local, USB or network destination using Robocopy.
 
 > **Status:** v1.0.0 released (milestones M1 to M6). **The manual tests in [MANUAL_TESTS.md](MANUAL_TESTS.md) have not been run yet; use v1 only on test PCs until they pass.** v2 (user picker and relevance columns on the Select screen) is in development. Findings: [docs/M1_FINDINGS.md](docs/M1_FINDINGS.md). Specification: [docs/SPEC.md](docs/SPEC.md). Decisions: [docs/DECISIONS.md](docs/DECISIONS.md).
@@ -76,3 +78,7 @@ dotnet build src\DataTransferTool -c SmokeTest
 dotnet build tests\DttUiSmoke -c Release
 tests\DttUiSmoke\bin\Release\DttUiSmoke.exe src\DataTransferTool\bin\SmokeTest\DataTransferTool.exe <screenshot folder> <work folder> <small tree> <large tree> <many-files tree>
 ```
+
+## License
+
+**All rights reserved.** This is proprietary software: no one may use, copy, change or share it, and no business may use it, without the owner's written permission. The code and the downloads being visible on GitHub do not give permission. See [LICENSE](LICENSE).
