@@ -8,6 +8,17 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-19 — License: all rights reserved; repository stays public
+
+- The owner chose an all-rights-reserved license over a non-commercial one (PolyForm
+  Noncommercial): no use of any kind, and no business or for-profit use, without written
+  permission. Copyright holder named by the GitHub account; the owner may replace it with a
+  legal name.
+- The repository stays public (owner). Its code and the v1.0.3 download can be seen and
+  downloaded, but the license grants no right to use them. GitHub's terms still let others view
+  and fork a public repository on GitHub.
+- Who: owner.
+
 ## 2026-11-15 — v1.0.2: failures point at their log entry; V2-M4 paused
 
 - After a real-life test with v1 the owner asked for each error in the failures CSV to name its

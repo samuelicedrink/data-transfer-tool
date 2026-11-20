@@ -11,6 +11,10 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ### Added
 
+- `LICENSE`: all rights reserved (owner, 2026-11-19). No use, copying, changes or sharing, and no business or for-profit use, without the owner's written permission; the public repository and its downloads do not grant any. README says so at the top.
+
+### Added
+
 - v2 started: `docs/SPEC_V2.md` describes the Select-screen redesign (user picker with access level; Modified, Size, Relevant and Advice columns) and its milestones V2-M1 to V2-M4. Exe version 2.0.0-alpha.
 - Core: `UserDirectory` lists the people who have signed in on this PC (profile list; system profiles and profiles whose folder is gone left out) with account name, last sign-in (profile load time, else `NTUSER.DAT` time), signed in now (Remote Desktop session list) and access level: Local admin (direct, or via a named group such as a domain group), Standard user, or Access unknown with the reason (domain not reachable, Microsoft Entra groups offline, Administrators group unreadable). Membership is read with the AuthZ API; nothing is guessed (V2-M1).
 - Select step: **User** picker at the top left ("All users" first, then signed-in users first and most recent sign-in next), each entry with its access level; the line beside it shows access and sign-in, the tooltip the profile folder. Picking a user ticks nothing; it only sets whose data the relevance estimate is for (owner, 2026-11-15). *Tick user data* still ticks every profile, as in v1. A SID is never shown: a group without a name reads "a Microsoft Entra group" or "a group whose name cannot be looked up". The list loads in the background. The picked user is saved in the job as a SID only (V2-M1).
