@@ -314,13 +314,36 @@ namespace DataTransfer.Core
                 t.BytesSkipped = Math.Max(0, t.BytesTotal - t.BytesCopied - t.BytesFailed);
                 src.Status = src.Failures.Count > 0 ? SourceStatus.CompletedWithErrors : SourceStatus.Completed;
                 SaveState(job);
-                // a retried folder is created by Robocopy with its source attributes again
-                if (folderRetried && !job.Options.KeepHiddenAttributes)
-                    foreach (var d in group.Where(f => f.IsDirectory))
-                        try { Unhide.ClearTree(job.DestinationFor(d.SourcePath), ct); } catch (ArgumentException) { }
+                // every Robocopy run gives its destination folder the source folder's attributes again,
+                // also a files-only retry (v1.0.4: retrying C:\pagefile.sys hid the copied "C" folder)
+                if (!job.Options.KeepHiddenAttributes) MakeRetriedVisible(group, ct);
                 Say($"Retry for {src.Path}: {retried.Count - still.Keys.Count(retried.Contains)} of {retried.Count} resolved");
             }
             return AttemptEnd.Finished;
+        }
+
+        /// <summary>
+        /// Clears Hidden and System again after a retry: the folder of each retried file and the
+        /// folders above it, and the whole tree of each retried folder.
+        /// </summary>
+        void MakeRetriedVisible(IEnumerable<FileFailure> retried, CancellationToken ct)
+        {
+            var r = new UnhideResult();
+            var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in retried)
+            {
+                try
+                {
+                    string dest = job.DestinationFor(f.IsDirectory ? f.SourcePath : Path.GetDirectoryName(f.SourcePath));
+                    if (!folders.Add(dest + (f.IsDirectory ? "|tree" : ""))) continue;
+                    var chain = Unhide.ClearChain(dest, job.DestinationRoot);
+                    r.Cleared += chain.Cleared; r.Failed += chain.Failed; r.FirstError = r.FirstError ?? chain.FirstError;
+                    if (f.IsDirectory) Unhide.ClearTree(dest, ct, r);
+                }
+                catch (ArgumentException) { }
+            }
+            if (r.Failed > 0)
+                Say($"{r.Failed:N0} retried item(s) could not be made visible ({r.FirstError})");
         }
 
         /// <summary>
