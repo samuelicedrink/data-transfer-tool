@@ -238,6 +238,48 @@ namespace DataTransfer.Core.Tests
         }
 
         [Test]
+        public void HiddenFolders_StayVisible_AfterFilesInThemAreRetried()
+        {
+            // v1.0.4: in the field, retrying C:\pagefile.sys made the copied "C" folder Hidden + System
+            // again, because a files-only Robocopy run gives the folder its source attributes.
+            var rng = new Random(12);
+            string src = Path.Combine(root, "t11", "src"), dest = Path.Combine(root, "t11", "dest");
+            Write(Path.Combine(src, "normal.txt"), 100, rng);
+            string lockedTop = Path.Combine(src, "pagefile.sys");
+            string lockedInner = Path.Combine(src, "ProgramData", "app.db");
+            Write(lockedTop, 300, rng);
+            Write(lockedInner, 200, rng);
+            Write(Path.Combine(src, "ProgramData", "ok.txt"), 100, rng);
+            const FileAttributes HS = FileAttributes.Hidden | FileAttributes.System;
+            new DirectoryInfo(Path.Combine(src, "ProgramData")).Attributes |= FileAttributes.Hidden;
+            new DirectoryInfo(src).Attributes |= HS;   // like a drive root
+            try
+            {
+                List<string> StillHidden() =>
+                    new[] { Path.Combine(dest, "TESTPC") }.Concat(Directory.EnumerateFileSystemEntries(Path.Combine(dest, "TESTPC"), "*", SearchOption.AllDirectories))
+                                                          .Where(p => (File.GetAttributes(p) & HS) != 0).ToList();
+
+                // locked through the main pass and the automatic retry: reported as failed
+                var job = NewJob(dest, src);
+                using (new FileStream(lockedTop, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                using (new FileStream(lockedInner, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+                    Assert.That(NewEngine(job).Run(CancellationToken.None), Is.EqualTo(JobOutcome.CompletedWithErrors));
+                Assert.That(job.AllFailures().Count(), Is.EqualTo(2));
+                Assert.That(StillHidden(), Is.Empty, "visible after the automatic retry of the locked files");
+
+                // the report's "Retry failed" button, files now closed
+                Assert.That(NewEngine(job).RetryFailed(CancellationToken.None), Is.EqualTo(JobOutcome.Completed));
+                Assert.That(job.AllFailures(), Is.Empty);
+                Assert.That(StillHidden(), Is.Empty, "visible after Retry failed");
+                AssertMirrored(job, src);
+            }
+            finally
+            {
+                new DirectoryInfo(src).Attributes &= ~HS;
+            }
+        }
+
+        [Test]
         public void AppData_ExcludedOnlyDirectlyUnderAProfile()
         {
             var rng = new Random(2);

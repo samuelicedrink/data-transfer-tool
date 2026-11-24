@@ -9,6 +9,13 @@ Change categories: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Securi
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-24
+
+### Fixed
+
+- The copied computer folder could still be hidden after a 1.0.3 copy (found by the owner in two real-life jobs, 2026-11-24). The tool made everything visible after the main pass, but the locked-file retry and *Retry failed* run Robocopy again per folder, and every Robocopy run gives its destination folder the attributes of the source folder, so retrying `C:\pagefile.sys` made `<Dest>\<COMPUTERNAME>\C` Hidden + System again. After any retry, the folder of each retried file and every folder above it up to the destination are now made visible again (the whole tree for a retried folder, as before). Test: `HiddenFolders_StayVisible_AfterFilesInThemAreRetried` (a Hidden + System source root and a hidden subfolder, each with a locked file; failed before the fix, passes after).
+- To repair a copy made by 1.0.3: run the same job again, or `attrib -h -s "<Dest>\<COMPUTERNAME>\*" /d` for the top folder.
+
 ### Added
 
 - `LICENSE`: all rights reserved (owner, 2026-11-19). No use, copying, changes or sharing, and no business or for-profit use, without the owner's written permission; the public repository and its downloads do not grant any. README says so at the top.

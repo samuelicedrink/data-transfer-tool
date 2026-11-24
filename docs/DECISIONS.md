@@ -8,6 +8,16 @@ Newest first. One entry per decision: date, what was decided, why, who decided.
 > nothing. They were reconstructed from the session record and the change log
 > and added in one commit.
 
+## 2026-11-24 — v1.0.4: copied folders stay visible after retries
+
+- The owner found the copied computer folder still hidden after two real 1.0.3 jobs. Cause:
+  the locked-file retry and *Retry failed* run Robocopy per folder after the folders were made
+  visible, and each run gives its destination folder the source folder's attributes again
+  (retrying `C:\pagefile.sys` hid `<Dest>\<COMPUTERNAME>\C`). Fixed by clearing the retried
+  folders and the folders above them after every retry. Not recognised in 1.0.3 because its test
+  had no locked file in a hidden folder.
+- Who: owner asked for the fix and the 1.0.4 build.
+
 ## 2026-11-19 — License: all rights reserved; repository stays public
 
 - The owner chose an all-rights-reserved license over a non-commercial one (PolyForm
